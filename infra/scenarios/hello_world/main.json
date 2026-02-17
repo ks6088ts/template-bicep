@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.40.2.10011",
+      "templateHash": "370860543480818906"
+    }
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the scenario"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "The location for the resource group"
+      }
+    }
+  },
+  "variables": {
+    "randomName": "[format('{0}-{1}', parameters('name'), uniqueString(subscription().id, parameters('location'), parameters('name')))]"
+  },
+  "resources": {},
+  "outputs": {
+    "randomName": {
+      "type": "string",
+      "value": "[variables('randomName')]"
+    }
+  }
+}
