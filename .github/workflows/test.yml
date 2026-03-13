@@ -24,7 +24,7 @@ jobs:
       ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-      TRIVY_VERSION: v0.68.2
+      TRIVY_VERSION: v0.69.3
     steps:
       - name: Log into Azure
         uses: azure/login@v2
@@ -37,7 +37,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Install Trivy
-        uses: aquasecurity/setup-trivy@v0.2.5
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
         with:
           version: ${{ env.TRIVY_VERSION }}
       - name: Install Azure CLI
