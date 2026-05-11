@@ -1,0 +1,296 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.43.8.12551",
+      "templateHash": "2211824166221374758"
+    }
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "metadata": {
+        "description": "The name of the scenario, used to derive resource names"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "The location for the resource group and User Assigned Managed Identity"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "scenario": "[parameters('name')]",
+        "managedBy": "bicep"
+      },
+      "metadata": {
+        "description": "Tags applied to all resources"
+      }
+    }
+  },
+  "variables": {
+    "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
+    "userAssignedIdentityName": "[format('id-{0}', parameters('name'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-rg-deployment', parameters('name')), 64)]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('resourceGroupName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "13006231347032579543"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 90,
+              "metadata": {
+                "description": "The name of the resource group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the resource group will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the resource group"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2025-04-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the resource group"
+              },
+              "value": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the resource group"
+              },
+              "value": "[parameters('name')]"
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The location of the resource group"
+              },
+              "value": "[reference(subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name')), '2025-04-01', 'full').location]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-uami-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('userAssignedIdentityName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "2934015800894633207"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128,
+              "metadata": {
+                "description": "The name of the User Assigned Managed Identity"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the User Assigned Managed Identity will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the User Assigned Managed Identity"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2024-11-30",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the User Assigned Managed Identity"
+              },
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the User Assigned Managed Identity"
+              },
+              "value": "[parameters('name')]"
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "The principal ID of the User Assigned Managed Identity (used for role assignments)"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').principalId]"
+            },
+            "clientId": {
+              "type": "string",
+              "metadata": {
+                "description": "The client ID of the User Assigned Managed Identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').clientId]"
+            },
+            "tenantId": {
+              "type": "string",
+              "metadata": {
+                "description": "The tenant ID of the User Assigned Managed Identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').tenantId]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "resourceGroupId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created resource group"
+      },
+      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.id.value]"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created resource group"
+      },
+      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.name.value]"
+    },
+    "resourceGroupLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "The location of the created resource group"
+      },
+      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.location.value]"
+    },
+    "userAssignedIdentityId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created User Assigned Managed Identity"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.id.value]"
+    },
+    "userAssignedIdentityName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created User Assigned Managed Identity"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.name.value]"
+    },
+    "userAssignedIdentityPrincipalId": {
+      "type": "string",
+      "metadata": {
+        "description": "The principal ID of the created User Assigned Managed Identity"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.principalId.value]"
+    },
+    "userAssignedIdentityClientId": {
+      "type": "string",
+      "metadata": {
+        "description": "The client ID of the created User Assigned Managed Identity"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.clientId.value]"
+    },
+    "userAssignedIdentityTenantId": {
+      "type": "string",
+      "metadata": {
+        "description": "The tenant ID of the created User Assigned Managed Identity"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.tenantId.value]"
+    }
+  }
+}
