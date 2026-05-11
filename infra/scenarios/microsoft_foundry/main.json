@@ -1,0 +1,837 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.42.1.51946",
+      "templateHash": "1381253005405354872"
+    }
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "metadata": {
+        "description": "The name of the scenario, used to derive resource names"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "The location for the resource group and Azure AI Foundry resources"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "scenario": "[parameters('name')]",
+        "managedBy": "bicep"
+      },
+      "metadata": {
+        "description": "Tags applied to all resources"
+      }
+    },
+    "existingUserAssignedIdentityName": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128,
+      "metadata": {
+        "description": "The name of the existing User Assigned Managed Identity that will call Azure AI Foundry"
+      }
+    },
+    "existingUserAssignedIdentityResourceGroupName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 90,
+      "metadata": {
+        "description": "The resource group name where the existing User Assigned Managed Identity exists"
+      }
+    },
+    "models": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "gpt-5.4",
+          "modelName": "gpt-5.4",
+          "modelFormat": "OpenAI",
+          "skuName": "GlobalStandard",
+          "skuCapacity": 50
+        },
+        {
+          "name": "gpt-5.4-nano",
+          "modelName": "gpt-5.4-nano",
+          "modelFormat": "OpenAI",
+          "skuName": "GlobalStandard",
+          "skuCapacity": 50
+        },
+        {
+          "name": "text-embedding-3-large",
+          "modelName": "text-embedding-3-large",
+          "modelFormat": "OpenAI",
+          "skuName": "Standard",
+          "skuCapacity": 50
+        },
+        {
+          "name": "text-embedding-3-small",
+          "modelName": "text-embedding-3-small",
+          "modelFormat": "OpenAI",
+          "skuName": "Standard",
+          "skuCapacity": 50
+        }
+      ],
+      "metadata": {
+        "description": "The list of model deployments to create in Azure AI Foundry"
+      }
+    },
+    "roleDefinitionIds": {
+      "type": "array",
+      "defaultValue": [
+        "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+      ],
+      "metadata": {
+        "description": "Role definition GUIDs assigned to the existing User Assigned Managed Identity at Azure AI Foundry account scope"
+      }
+    }
+  },
+  "variables": {
+    "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
+    "foundryAccountName": "[take(toLower(replace(format('aif-{0}', parameters('name')), '_', '-')), 59)]",
+    "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-rg-deployment', parameters('name')), 64)]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('resourceGroupName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "10375022168103187164"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 90,
+              "metadata": {
+                "description": "The name of the resource group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the resource group will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the resource group"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2025-04-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the resource group"
+              },
+              "value": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the resource group"
+              },
+              "value": "[parameters('name')]"
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The location of the resource group"
+              },
+              "value": "[reference(subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name')), '2025-04-01', 'full').location]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-foundry-account-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "11338207591442137092"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the Azure AI Foundry account"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Azure AI Foundry account will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Azure AI Foundry account"
+              }
+            },
+            "customSubDomainName": {
+              "type": "string",
+              "defaultValue": "[parameters('name')]",
+              "minLength": 2,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The custom subdomain name for the Azure AI Foundry account endpoint"
+              }
+            },
+            "publicNetworkAccess": {
+              "type": "string",
+              "defaultValue": "Enabled",
+              "allowedValues": [
+                "Enabled",
+                "Disabled"
+              ],
+              "metadata": {
+                "description": "Controls public network access to the Azure AI Foundry account"
+              }
+            },
+            "disableLocalAuth": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Disable local authentication (API keys) and require Entra ID authentication"
+              }
+            },
+            "enableSystemAssignedIdentity": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable System Assigned Managed Identity for the Azure AI Foundry account"
+              }
+            }
+          },
+          "resources": {
+            "foundryAccountWithIdentity": {
+              "condition": "[parameters('enableSystemAssignedIdentity')]",
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2026-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "kind": "AIServices",
+              "sku": {
+                "name": "S0"
+              },
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "customSubDomainName": "[parameters('customSubDomainName')]",
+                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
+                "disableLocalAuth": "[parameters('disableLocalAuth')]"
+              },
+              "identity": {
+                "type": "SystemAssigned"
+              }
+            },
+            "foundryAccountWithoutIdentity": {
+              "condition": "[not(parameters('enableSystemAssignedIdentity'))]",
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2026-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "kind": "AIServices",
+              "sku": {
+                "name": "S0"
+              },
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "customSubDomainName": "[parameters('customSubDomainName')]",
+                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
+                "disableLocalAuth": "[parameters('disableLocalAuth')]"
+              }
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Azure AI Foundry account"
+              },
+              "value": "[if(parameters('enableSystemAssignedIdentity'), resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), resourceId('Microsoft.CognitiveServices/accounts', parameters('name')))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Azure AI Foundry account"
+              },
+              "value": "[if(parameters('enableSystemAssignedIdentity'), parameters('name'), parameters('name'))]"
+            },
+            "endpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "The endpoint of the Azure AI Foundry account"
+              },
+              "value": "[if(parameters('enableSystemAssignedIdentity'), reference('foundryAccountWithIdentity').endpoint, reference('foundryAccountWithoutIdentity').endpoint)]"
+            },
+            "principalId": {
+              "type": "string",
+              "nullable": true,
+              "metadata": {
+                "description": "The principal ID of the Azure AI Foundry account System Assigned Managed Identity (null when disabled)"
+              },
+              "value": "[if(parameters('enableSystemAssignedIdentity'), reference('foundryAccountWithIdentity', '2026-03-01', 'full').identity.principalId, null())]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-foundry-project-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "parentAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "name": {
+            "value": "[variables('foundryProjectName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "displayName": {
+            "value": "[variables('foundryProjectName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "13382024662621289461"
+            }
+          },
+          "parameters": {
+            "parentAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the parent Azure AI Foundry account"
+              }
+            },
+            "name": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The name of the Azure AI Foundry project"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Azure AI Foundry project will be created"
+              }
+            },
+            "displayName": {
+              "type": "string",
+              "defaultValue": "[parameters('name')]",
+              "minLength": 2,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The display name of the Azure AI Foundry project"
+              }
+            },
+            "projectDescription": {
+              "type": "string",
+              "defaultValue": "",
+              "maxLength": 1024,
+              "metadata": {
+                "description": "The description of the Azure AI Foundry project"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Azure AI Foundry project"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts/projects",
+              "apiVersion": "2025-12-01",
+              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": "[shallowMerge(createArray(createObject('displayName', parameters('displayName')), if(empty(parameters('projectDescription')), createObject(), createObject('description', parameters('projectDescription')))))]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Azure AI Foundry project"
+              },
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('parentAccountName'), parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Azure AI Foundry project"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-account-deployment', parameters('name')), 64))]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "modelDeployments",
+        "count": "[length(parameters('models'))]",
+        "mode": "serial",
+        "batchSize": 1
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-model-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "parentAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "name": {
+            "value": "[parameters('models')[copyIndex()].name]"
+          },
+          "modelName": {
+            "value": "[parameters('models')[copyIndex()].modelName]"
+          },
+          "modelVersion": {
+            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelVersion'), ''))]"
+          },
+          "modelFormat": {
+            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelFormat'), 'OpenAI'))]"
+          },
+          "skuName": {
+            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'skuName'), 'GlobalStandard'))]"
+          },
+          "skuCapacity": {
+            "value": "[int(coalesce(tryGet(parameters('models')[copyIndex()], 'skuCapacity'), 50))]"
+          },
+          "raiPolicyName": {
+            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'raiPolicyName'), ''))]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "5808504932132325214"
+            }
+          },
+          "parameters": {
+            "parentAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the parent Azure AI Foundry account"
+              }
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The name of the model deployment"
+              }
+            },
+            "modelName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "metadata": {
+                "description": "The model name to deploy"
+              }
+            },
+            "modelVersion": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The model version to deploy (optional)"
+              }
+            },
+            "modelFormat": {
+              "type": "string",
+              "defaultValue": "OpenAI",
+              "minLength": 1,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The model format to deploy"
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "GlobalStandard",
+              "minLength": 1,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The SKU name for the model deployment"
+              }
+            },
+            "skuCapacity": {
+              "type": "int",
+              "defaultValue": 50,
+              "minValue": 1,
+              "metadata": {
+                "description": "The SKU capacity for the model deployment"
+              }
+            },
+            "raiPolicyName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The Responsible AI policy name (optional)"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2026-03-01",
+              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
+              "sku": {
+                "name": "[parameters('skuName')]",
+                "capacity": "[parameters('skuCapacity')]"
+              },
+              "properties": "[shallowMerge(createArray(createObject('model', shallowMerge(createArray(createObject('format', parameters('modelFormat'), 'name', parameters('modelName')), if(empty(parameters('modelVersion')), createObject(), createObject('version', parameters('modelVersion')))))), if(empty(parameters('raiPolicyName')), createObject(), createObject('raiPolicyName', parameters('raiPolicyName')))))]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the model deployment"
+              },
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the model deployment"
+              },
+              "value": "[parameters('name')]"
+            },
+            "provisioningState": {
+              "type": "string",
+              "metadata": {
+                "description": "The provisioning state of the model deployment"
+              },
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name')), '2026-03-01').provisioningState]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-project-deployment', parameters('name')), 64))]"
+      ]
+    },
+    {
+      "copy": {
+        "name": "roleAssignments",
+        "count": "[length(parameters('roleDefinitionIds'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-role-{1}-deployment', parameters('name'), substring(parameters('roleDefinitionIds')[copyIndex()], 0, 8)), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "principalId": {
+            "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('existingUserAssignedIdentityResourceGroupName')), 'Microsoft.ManagedIdentity/userAssignedIdentities', parameters('existingUserAssignedIdentityName')), '2024-11-30').principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionIds')[copyIndex()])]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-account-deployment', parameters('name')), 64)), '2025-04-01').outputs.id.value, reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('existingUserAssignedIdentityResourceGroupName')), 'Microsoft.ManagedIdentity/userAssignedIdentities', parameters('existingUserAssignedIdentityName')), '2024-11-30').principalId, parameters('roleDefinitionIds')[copyIndex()])]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "17805555448297308216"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry account resource"
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(parameters('targetAccountName'), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[variables('roleAssignmentName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-account-deployment', parameters('name')), 64))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "resourceGroupId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created resource group"
+      },
+      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.id.value]"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created resource group"
+      },
+      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.name.value]"
+    },
+    "resourceGroupLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "The location of the created resource group"
+      },
+      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.location.value]"
+    },
+    "foundryAccountId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Azure AI Foundry account"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-account-deployment', parameters('name')), 64)), '2025-04-01').outputs.id.value]"
+    },
+    "foundryAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created Azure AI Foundry account"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-account-deployment', parameters('name')), 64)), '2025-04-01').outputs.name.value]"
+    },
+    "foundryEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "The endpoint of the created Azure AI Foundry account"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-account-deployment', parameters('name')), 64)), '2025-04-01').outputs.endpoint.value]"
+    },
+    "foundryProjectId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Azure AI Foundry project"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-project-deployment', parameters('name')), 64)), '2025-04-01').outputs.id.value]"
+    },
+    "foundryProjectName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created Azure AI Foundry project"
+      },
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-foundry-project-deployment', parameters('name')), 64)), '2025-04-01').outputs.name.value]"
+    },
+    "deployedModelNames": {
+      "type": "array",
+      "metadata": {
+        "description": "The names of model deployments requested by this scenario"
+      },
+      "copy": {
+        "count": "[length(parameters('models'))]",
+        "input": "[parameters('models')[copyIndex()].name]"
+      }
+    },
+    "roleAssignmentIds": {
+      "type": "array",
+      "metadata": {
+        "description": "The resource IDs of role assignments granted to the existing User Assigned Managed Identity"
+      },
+      "copy": {
+        "count": "[length(range(0, length(parameters('roleDefinitionIds'))))]",
+        "input": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-role-{1}-deployment', parameters('name'), substring(parameters('roleDefinitionIds')[range(0, length(parameters('roleDefinitionIds')))[copyIndex()]], 0, 8)), 64)), '2025-04-01').outputs.id.value]"
+      }
+    }
+  }
+}
