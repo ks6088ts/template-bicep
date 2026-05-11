@@ -1,0 +1,6 @@
+# azd environment state
+.azure/
+
+# Local secrets
+*.local.env
+.env
