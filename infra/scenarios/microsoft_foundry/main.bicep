@@ -58,8 +58,26 @@ param existingServicePrincipalObjectIds string[] = []
 @description('Optional. Array of object IDs of existing Microsoft Entra users to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no user is attached.')
 param existingUserObjectIds string[] = []
 
+@description('Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication.')
+param disableLocalAuth bool = true
+
 @description('The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs.')
 param models array = [
+  {
+    name: 'gpt-4o'
+    modelName: 'gpt-4o'
+    modelFormat: 'OpenAI'
+    skuName: 'GlobalStandard'
+    skuCapacity: 50
+  }
+  {
+    name: 'gpt-5'
+    modelName: 'gpt-5'
+    modelVersion: '2025-08-07'
+    modelFormat: 'OpenAI'
+    skuName: 'GlobalStandard'
+    skuCapacity: 50
+  }
   {
     name: 'text-embedding-3-large'
     modelName: 'text-embedding-3-large'
@@ -151,6 +169,7 @@ module foundryAccount '../../modules/microsoft_foundry/main.bicep' = {
     name: foundryAccountName
     location: location
     tags: tags
+    disableLocalAuth: disableLocalAuth
   }
   dependsOn: [resourceGroup]
 }

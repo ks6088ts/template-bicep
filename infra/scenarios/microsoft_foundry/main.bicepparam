@@ -12,6 +12,9 @@ param tags = {
   CostControl: 'Ignore'
 }
 
+// Enable API key based authentication on the Foundry account. Set to true to require Entra ID only.
+param disableLocalAuth = false
+
 // Optional: attach existing User Assigned Managed Identities (UAMI) to receive Foundry inference
 // role assignments. Leave commented out (or set to []) to keep the default behavior of skipping
 // the role assignment (no UAMI is attached).

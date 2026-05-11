@@ -38,6 +38,7 @@ For every supplied identity, the scenario emits one role assignment per entry in
 | `existingUserAssignedIdentities` | `array` | `[]` | Optional. Existing UAMIs to grant Foundry call permissions. Each item is `{ name: string, resourceGroup: string }`. Leave empty to skip the role assignment. |
 | `existingServicePrincipalObjectIds` | `array` | `[]` | Optional. Object (principal) IDs of existing Microsoft Entra service principals to grant Foundry call permissions. Use service principal object IDs (Enterprise Application), not the application/client IDs. Leave empty to skip the role assignment. |
 | `existingUserObjectIds` | `array` | `[]` | Optional. Object IDs of existing Microsoft Entra users to grant Foundry call permissions. Leave empty to skip the role assignment. |
+| `disableLocalAuth` | `bool` | `true` | Disable local authentication (API keys) on the Foundry account. Set to `false` to enable API key based authentication. |
 | `models` | `array` | See `main.bicep` | Model deployments to create under the Foundry account. |
 | `roleDefinitionIds` | `array` | `['5e0bd9bd-7b93-4f28-af87-19fc36ad61bd']` | Role definition GUIDs to assign at Foundry account scope. For each role, one role assignment is emitted per supplied identity in each of the three identity arrays. |
 
@@ -75,9 +76,9 @@ Or with the repository `Makefile`:
 make deploy SCENARIO=microsoft_foundry
 ```
 
-If target region does not support one of the default models (`gpt-5.4`, `gpt-5.4-nano`, `text-embedding-3-large`, `text-embedding-3-small`), edit `main.bicepparam` and remove/replace unsupported entries in `models` (for example, use `gpt-5` or `gpt-5-mini`).
+If target region does not support one of the default models (`gpt-4o`, `gpt-5`, `text-embedding-3-large`, `text-embedding-3-small`), edit `main.bicepparam` and remove/replace unsupported entries in `models` to match what is available in your region/quota. For example, `gpt-5` (version `2025-08-07`, GlobalStandard) is not available in `japaneast`; deploy in regions such as `eastus2` or `swedencentral`, or remove the entry from `models`.
 
-This scenario sets `disableLocalAuth: true` on the Foundry account so API keys are disabled and Entra ID (for example UAMI) is required.
+The `microsoft_foundry` module defaults `disableLocalAuth` to `true` (API keys disabled, Entra ID only). The bundled `main.bicepparam` overrides this with `param disableLocalAuth = false`, so deploying with the bundled parameter file enables API key based authentication on the Foundry account. Set `param disableLocalAuth = true` in `main.bicepparam` (or remove the line to fall back to the module default) to require Entra ID authentication only.
 
 ```python
 from azure.identity import DefaultAzureCredential
@@ -90,7 +91,7 @@ client = AzureOpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gpt-5.4",
+    model="gpt-4o",
     messages=[{"role": "user", "content": "Hello from UAMI"}]
 )
 print(response.choices[0].message.content)

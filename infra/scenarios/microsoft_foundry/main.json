@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "9116165606607852815"
+      "templateHash": "184112264665546968"
     }
   },
   "definitions": {
@@ -126,9 +126,31 @@
         "description": "Optional. Array of object IDs of existing Microsoft Entra users to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no user is attached."
       }
     },
+    "disableLocalAuth": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication."
+      }
+    },
     "models": {
       "type": "array",
       "defaultValue": [
+        {
+          "name": "gpt-4o",
+          "modelName": "gpt-4o",
+          "modelFormat": "OpenAI",
+          "skuName": "GlobalStandard",
+          "skuCapacity": 50
+        },
+        {
+          "name": "gpt-5",
+          "modelName": "gpt-5",
+          "modelVersion": "2025-08-07",
+          "modelFormat": "OpenAI",
+          "skuName": "GlobalStandard",
+          "skuCapacity": 50
+        },
         {
           "name": "text-embedding-3-large",
           "modelName": "text-embedding-3-large",
@@ -289,6 +311,9 @@
           },
           "tags": {
             "value": "[parameters('tags')]"
+          },
+          "disableLocalAuth": {
+            "value": "[parameters('disableLocalAuth')]"
           }
         },
         "template": {
