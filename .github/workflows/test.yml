@@ -15,17 +15,47 @@ permissions:
   contents: read
 
 jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      scenarios: ${{ steps.find.outputs.scenarios }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Discover scenarios
+        id: find
+        run: |
+          scenarios=$(find infra/scenarios -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R . | jq -sc .)
+          echo "scenarios=$scenarios" >> "$GITHUB_OUTPUT"
+          echo "Discovered scenarios: $scenarios"
+
+  trivy:
+    runs-on: ubuntu-latest
+    env:
+      TRIVY_VERSION: v0.69.3
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        with:
+          version: ${{ env.TRIVY_VERSION }}
+      - name: Run Trivy
+        run: make trivy
+
   infra:
+    needs: discover
     strategy:
+      fail-fast: false
       matrix:
         platform: [ubuntu-latest]
+        scenario: ${{ fromJson(needs.discover.outputs.scenarios) }}
     runs-on: ${{ matrix.platform }}
     environment: dev
     env:
       ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
-      TRIVY_VERSION: v0.69.3
       AZURE_CLI_VERSION: 2.86.0
       BICEP_CLI_VERSION: v0.43.8
     steps:
@@ -39,10 +69,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Install Trivy
-        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
-        with:
-          version: ${{ env.TRIVY_VERSION }}
       - name: Install Azure CLI
         run: |
           sudo apt-get update
@@ -50,6 +76,6 @@ jobs:
           az bicep install --version ${{ env.BICEP_CLI_VERSION }}
           az --version
           az bicep version
-      - name: Run CI tests
+      - name: Run CI tests for ${{ matrix.scenario }}
         run: |
-          make ci-test
+          make _ci-test-base SCENARIO=${{ matrix.scenario }}

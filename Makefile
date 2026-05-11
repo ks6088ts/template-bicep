@@ -16,6 +16,8 @@ SCENARIO_DIR_LIST ?= $(shell find infra/scenarios -maxdepth 1 -mindepth 1 -type 
 RESOURCE_GROUP ?= rg-$(SCENARIO)
 LOCATION ?= japaneast
 DEPLOYMENT_NAME ?= $(SCENARIO)_deployment
+# Number of parallel processes used by xargs (defaults to CPU core count; override with PARALLEL=1 to run sequentially)
+PARALLEL ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 4)
 
 .PHONY: help
 help:
@@ -41,7 +43,8 @@ lint: ## lint bicep files
 	@find $(SCENARIO_DIR) \
 		-name '*.bicep' \
 		-type f \
-		| xargs -I {} sh -c ' \
+		-print0 \
+		| xargs -0 -P $(PARALLEL) -I {} sh -c ' \
 			echo "Linting: {}" && \
 			az bicep lint --file {} || exit 255 \
 		'
@@ -55,9 +58,11 @@ fix: ## fix formatting
 	@find $(SCENARIO_DIR) \
 		-name '*.bicep' \
 		-type f \
-		-exec az bicep format \
-			--file {} \
-			--insert-final-newline \;
+		-print0 \
+		| xargs -0 -P $(PARALLEL) -I {} \
+			az bicep format \
+				--file {} \
+				--insert-final-newline
 
 .PHONY: build
 build: ## build bicep files
@@ -82,11 +87,10 @@ test: ## test bicep files (what-if deployment)
 _ci-test-base: install-deps-dev lint build git-diff test
 
 .PHONY: ci-test
-ci-test: trivy ## ci test
-	@for dir in $(SCENARIO_DIR_LIST) ; do \
-		echo "Test: $$dir" ; \
-		make _ci-test-base SCENARIO=$$(basename $$dir) || exit 1 ; \
-	done
+ci-test: trivy ## ci test (scenarios run in parallel; override with PARALLEL=1 for sequential)
+	@printf '%s\n' $(SCENARIO_DIR_LIST) \
+		| xargs -P $(PARALLEL) -I {} \
+			sh -c 'echo "Test: {}" && $(MAKE) --no-print-directory _ci-test-base SCENARIO=$$(basename {})'
 
 .PHONY: deploy
 deploy: ## deploy resources
