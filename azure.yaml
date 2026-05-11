@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: template-bicep
+metadata:
+  template: template-bicep@0.0.1
+infra:
+  provider: bicep
+  # FIXME: Rewrite the scenario name below to switch scenarios (e.g. resource_group).
+  path: infra/scenarios/resource_group
+  module: main
