@@ -1,6 +1,37 @@
 targetScope = 'subscription'
 
 // ------------------
+//    TYPES
+// ------------------
+
+@description('Reference to an existing User Assigned Managed Identity (UAMI).')
+type uamiReference = {
+  @description('The name of the existing User Assigned Managed Identity.')
+  name: string
+
+  @description('The resource group name where the existing UAMI lives.')
+  resourceGroup: string
+}
+
+@description('A (UAMI, role definition) pair generated for each role assignment iteration.')
+type uamiRolePair = {
+  @description('Index of the UAMI in `existingUserAssignedIdentities` whose principalId receives the role.')
+  uamiIndex: int
+
+  @description('Role definition GUID to grant at Foundry account scope.')
+  roleDefinitionGuid: string
+}
+
+@description('A (principal object ID, role definition) pair generated for each service principal/user role assignment iteration.')
+type principalRolePair = {
+  @description('The Microsoft Entra principal (object) ID that receives the role.')
+  principalId: string
+
+  @description('Role definition GUID to grant at Foundry account scope.')
+  roleDefinitionGuid: string
+}
+
+// ------------------
 //    PARAMETERS
 // ------------------
 
@@ -18,13 +49,14 @@ param tags object = {
   managedBy: 'bicep'
 }
 
-@description('Optional. The name of an existing User Assigned Managed Identity (UAMI) to grant Azure AI Foundry inference permissions. Leave empty to skip the role assignment (no UAMI is attached by default).')
-@maxLength(128)
-param existingUserAssignedIdentityName string = ''
+@description('Optional. Array of existing User Assigned Managed Identities (UAMI) to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no UAMI is attached.')
+param existingUserAssignedIdentities uamiReference[] = []
 
-@description('Optional. The resource group name where the existing User Assigned Managed Identity lives. Required only when existingUserAssignedIdentityName is provided.')
-@maxLength(90)
-param existingUserAssignedIdentityResourceGroupName string = ''
+@description('Optional. Array of object (principal) IDs of existing Microsoft Entra service principals to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no service principal is attached.')
+param existingServicePrincipalObjectIds string[] = []
+
+@description('Optional. Array of object IDs of existing Microsoft Entra users to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no user is attached.')
+param existingUserObjectIds string[] = []
 
 @description('The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs.')
 param models array = [
@@ -44,8 +76,8 @@ param models array = [
   }
 ]
 
-@description('Role definition GUIDs assigned to the existing User Assigned Managed Identity at Azure AI Foundry account scope')
-param roleDefinitionIds array = [
+@description('Role definition GUIDs assigned to every existing UAMI, service principal, and user at Azure AI Foundry account scope.')
+param roleDefinitionIds string[] = [
   '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 ]
 
@@ -56,16 +88,47 @@ param roleDefinitionIds array = [
 var resourceGroupName = 'rg-${name}'
 var foundryAccountName = take(toLower(replace('aif-${name}', '_', '-')), 59)
 var foundryProjectName = take('proj-${name}', 64)
-var attachExistingUserAssignedIdentity = !empty(existingUserAssignedIdentityName)
+
+// Cross-product each identity array with `roleDefinitionIds` into a flat list of struct pairs.
+// `map`/`flatten` keep the cross product readable and naturally produce an empty list when the
+// identity array is empty, so no flag variables or `if` guards are required at the loop sites.
+var uamiRolePairs uamiRolePair[] = flatten(map(
+  range(0, length(existingUserAssignedIdentities)),
+  uamiIndex =>
+    map(roleDefinitionIds, roleDefinitionGuid => {
+      uamiIndex: uamiIndex
+      roleDefinitionGuid: roleDefinitionGuid
+    })
+))
+
+var servicePrincipalRolePairs principalRolePair[] = flatten(map(
+  existingServicePrincipalObjectIds,
+  principalId =>
+    map(roleDefinitionIds, roleDefinitionGuid => {
+      principalId: principalId
+      roleDefinitionGuid: roleDefinitionGuid
+    })
+))
+
+var userRolePairs principalRolePair[] = flatten(map(
+  existingUserObjectIds,
+  principalId =>
+    map(roleDefinitionIds, roleDefinitionGuid => {
+      principalId: principalId
+      roleDefinitionGuid: roleDefinitionGuid
+    })
+))
 
 // ------------------
 //    EXISTING RESOURCES
 // ------------------
 
-resource existingUserAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = if (attachExistingUserAssignedIdentity) {
-  scope: az.resourceGroup(existingUserAssignedIdentityResourceGroupName)
-  name: existingUserAssignedIdentityName
-}
+resource uamis 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = [
+  for uami in existingUserAssignedIdentities: {
+    scope: az.resourceGroup(uami.resourceGroup)
+    name: uami.name
+  }
+]
 
 // ------------------
 //    RESOURCES
@@ -107,35 +170,73 @@ module foundryProject '../../modules/microsoft_foundry_project/main.bicep' = {
 }
 
 @batchSize(1)
-module modelDeployments '../../modules/microsoft_foundry_model_deployment/main.bicep' = [for (model, i) in models: {
-  name: take('${name}-model-${i}-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    #disable-next-line BCP334
-    parentAccountName: foundryAccountName
-    name: model.name
-    modelName: model.modelName
-    modelVersion: string(model.?modelVersion ?? '')
-    modelFormat: string(model.?modelFormat ?? 'OpenAI')
-    skuName: string(model.?skuName ?? 'GlobalStandard')
-    skuCapacity: int(model.?skuCapacity ?? 50)
-    raiPolicyName: string(model.?raiPolicyName ?? '')
+module modelDeployments '../../modules/microsoft_foundry_model_deployment/main.bicep' = [
+  for (model, i) in models: {
+    name: take('${name}-model-${i}-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      #disable-next-line BCP334
+      parentAccountName: foundryAccountName
+      name: model.name
+      modelName: model.modelName
+      modelVersion: string(model.?modelVersion ?? '')
+      modelFormat: string(model.?modelFormat ?? 'OpenAI')
+      skuName: string(model.?skuName ?? 'GlobalStandard')
+      skuCapacity: int(model.?skuCapacity ?? 50)
+      raiPolicyName: string(model.?raiPolicyName ?? '')
+    }
+    dependsOn: [foundryProject]
   }
-  dependsOn: [foundryProject]
-}]
+]
 
-module roleAssignments '../../modules/role_assignment/main.bicep' = [for roleDefinitionGuid in roleDefinitionIds: if (attachExistingUserAssignedIdentity) {
-  name: take('${name}-role-${substring(roleDefinitionGuid, 0, 8)}-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    #disable-next-line BCP334
-    targetAccountName: foundryAccountName
-    principalId: existingUserAssignedIdentity!.properties.principalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitionGuid)
-    roleAssignmentNameSeed: guid(foundryAccount.outputs.id, existingUserAssignedIdentity!.properties.principalId, roleDefinitionGuid)
-    principalType: 'ServicePrincipal'
+module uamiRoleAssignments '../../modules/role_assignment/main.bicep' = [
+  for (pair, i) in uamiRolePairs: {
+    name: take('${name}-uami-role-${i}-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      #disable-next-line BCP334
+      targetAccountName: foundryAccountName
+      principalId: uamis[pair.uamiIndex].properties.principalId
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
+      roleAssignmentNameSeed: guid(
+        foundryAccount.outputs.id,
+        uamis[pair.uamiIndex].properties.principalId,
+        pair.roleDefinitionGuid
+      )
+      principalType: 'ServicePrincipal'
+    }
   }
-}]
+]
+
+module servicePrincipalRoleAssignments '../../modules/role_assignment/main.bicep' = [
+  for (pair, i) in servicePrincipalRolePairs: {
+    name: take('${name}-sp-role-${i}-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      #disable-next-line BCP334
+      targetAccountName: foundryAccountName
+      principalId: pair.principalId
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
+      roleAssignmentNameSeed: guid(foundryAccount.outputs.id, pair.principalId, pair.roleDefinitionGuid)
+      principalType: 'ServicePrincipal'
+    }
+  }
+]
+
+module userRoleAssignments '../../modules/role_assignment/main.bicep' = [
+  for (pair, i) in userRolePairs: {
+    name: take('${name}-user-role-${i}-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      #disable-next-line BCP334
+      targetAccountName: foundryAccountName
+      principalId: pair.principalId
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
+      roleAssignmentNameSeed: guid(foundryAccount.outputs.id, pair.principalId, pair.roleDefinitionGuid)
+      principalType: 'User'
+    }
+  }
+]
 
 // ------------------
 //    OUTPUTS
@@ -168,5 +269,13 @@ output foundryProjectName string = foundryProject.outputs.name
 @description('The names of model deployments requested by this scenario')
 output deployedModelNames array = [for model in models: model.name]
 
-@description('The resource IDs of role assignments granted to the existing User Assigned Managed Identity (empty when no UAMI is attached)')
-output roleAssignmentIds array = [for i in range(0, attachExistingUserAssignedIdentity ? length(roleDefinitionIds) : 0): roleAssignments[i]!.outputs.id]
+@description('The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)')
+output uamiRoleAssignmentIds string[] = [for (pair, i) in uamiRolePairs: uamiRoleAssignments[i].outputs.id]
+
+@description('The resource IDs of role assignments granted to every existing service principal (empty when no service principal is attached)')
+output servicePrincipalRoleAssignmentIds string[] = [
+  for (pair, i) in servicePrincipalRolePairs: servicePrincipalRoleAssignments[i].outputs.id
+]
+
+@description('The resource IDs of role assignments granted to every existing user (empty when no user is attached)')
+output userRoleAssignmentIds string[] = [for (pair, i) in userRolePairs: userRoleAssignments[i].outputs.id]

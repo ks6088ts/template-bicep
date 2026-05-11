@@ -102,8 +102,9 @@ deploy: ## deploy resources
 
 .PHONY: destroy
 destroy: ## destroy resources (delete resource group)
-	az deployment sub delete \
-		--name $(DEPLOYMENT_NAME)
+	az group delete \
+		--name $(RESOURCE_GROUP) \
+		--yes
 
 .PHONY: output
 output: ## show output values
