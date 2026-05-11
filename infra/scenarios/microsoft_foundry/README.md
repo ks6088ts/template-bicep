@@ -1,12 +1,12 @@
 ---
 title: Microsoft Foundry Scenario
-description: A Bicep scenario that provisions Azure AI Foundry account, project, model deployments, and optional role assignments for an existing User Assigned Managed Identity
+description: A Bicep scenario that provisions Azure AI Foundry account, project, model deployments, and optional role assignments for any number of existing User Assigned Managed Identities, service principals, or users
 ms.date: 2026-05-11
 ---
 
 # Microsoft Foundry Scenario
 
-A Bicep scenario that provisions an Azure AI Foundry account (`Microsoft.CognitiveServices/accounts`), a Foundry project, model deployments, and (optionally) scope-limited role assignments for an existing User Assigned Managed Identity (UAMI).
+A Bicep scenario that provisions an Azure AI Foundry account (`Microsoft.CognitiveServices/accounts`), a Foundry project, model deployments, and (optionally) scope-limited role assignments for any number of existing User Assigned Managed Identities (UAMI), Microsoft Entra service principals, and Microsoft Entra users.
 
 ## Overview
 
@@ -16,17 +16,17 @@ This scenario targets the subscription scope and composes reusable modules:
 2. [`microsoft_foundry` module](../../modules/microsoft_foundry/main.bicep) — creates the Azure AI Foundry account.
 3. [`microsoft_foundry_project` module](../../modules/microsoft_foundry_project/main.bicep) — creates the Foundry project under the account.
 4. [`microsoft_foundry_model_deployment` module](../../modules/microsoft_foundry_model_deployment/main.bicep) — creates model deployments under the account.
-5. [`role_assignment` module](../../modules/role_assignment/main.bicep) — grants Foundry inference permissions to an existing UAMI at account scope (opt-in).
+5. [`role_assignment` module](../../modules/role_assignment/main.bicep) — grants Foundry inference permissions to any combination of existing UAMIs, service principals, and users at account scope (all opt-in via array parameters).
 
 The scenario layer is responsible for:
 
 * Deriving resource names from a single `name` parameter.
 * Composing inputs (default tags, model list, role definition IDs).
-* Optionally referencing an existing UAMI by name and resource group; **by default, no UAMI is attached and no role assignments are created**.
+* Accepting three independent array parameters — UAMIs, service principal object IDs, and user object IDs — each defaulting to `[]`. **By default, no role assignments are created**, and supplying any non-empty array opts that category in.
 * Deploying models sequentially with `@batchSize(1)` to avoid concurrent deployment conflicts.
 * Surfacing module outputs to deployment consumers.
 
-When a UAMI is provided, role assignment defaults to **Cognitive Services OpenAI User** (`5e0bd9bd-7b93-4f28-af87-19fc36ad61bd`) because it is the stable, minimal permission set for model inference calls against the Foundry account.
+For every supplied identity, the scenario emits one role assignment per entry in `roleDefinitionIds`. The default `roleDefinitionIds` is **Cognitive Services OpenAI User** (`5e0bd9bd-7b93-4f28-af87-19fc36ad61bd`), the stable minimal permission set for model inference calls against the Foundry account. Each category has a dedicated `principalType` (`'ServicePrincipal'` for UAMIs and service principals, `'User'` for users) — placing an ID under the wrong array will cause Azure RBAC to reject the deployment with `UnmatchedPrincipalType`.
 
 ## Parameters
 
@@ -35,10 +35,11 @@ When a UAMI is provided, role assignment defaults to **Cognitive Services OpenAI
 | `name` | `string` | _(required)_ | Scenario name used to derive resource names. |
 | `location` | `string` | _(required)_ | Azure region for the resource group and Foundry resources. |
 | `tags` | `object` | `{ scenario: name, managedBy: 'bicep' }` | Tags applied to created resources. |
-| `existingUserAssignedIdentityName` | `string` | `''` | Optional. Existing UAMI name to grant Foundry call permissions. Leave empty to skip the role assignment. |
-| `existingUserAssignedIdentityResourceGroupName` | `string` | `''` | Optional. Resource group containing the existing UAMI. Required only when `existingUserAssignedIdentityName` is set. |
+| `existingUserAssignedIdentities` | `array` | `[]` | Optional. Existing UAMIs to grant Foundry call permissions. Each item is `{ name: string, resourceGroup: string }`. Leave empty to skip the role assignment. |
+| `existingServicePrincipalObjectIds` | `array` | `[]` | Optional. Object (principal) IDs of existing Microsoft Entra service principals to grant Foundry call permissions. Use service principal object IDs (Enterprise Application), not the application/client IDs. Leave empty to skip the role assignment. |
+| `existingUserObjectIds` | `array` | `[]` | Optional. Object IDs of existing Microsoft Entra users to grant Foundry call permissions. Leave empty to skip the role assignment. |
 | `models` | `array` | See `main.bicep` | Model deployments to create under the Foundry account. |
-| `roleDefinitionIds` | `array` | `['5e0bd9bd-7b93-4f28-af87-19fc36ad61bd']` | Role definition GUIDs to assign to the UAMI at Foundry account scope (only applied when a UAMI is provided). |
+| `roleDefinitionIds` | `array` | `['5e0bd9bd-7b93-4f28-af87-19fc36ad61bd']` | Role definition GUIDs to assign at Foundry account scope. For each role, one role assignment is emitted per supplied identity in each of the three identity arrays. |
 
 ## Outputs
 
@@ -53,7 +54,9 @@ When a UAMI is provided, role assignment defaults to **Cognitive Services OpenAI
 | `foundryProjectId` | `string` | Resource ID of the created Foundry project. |
 | `foundryProjectName` | `string` | Name of the created Foundry project. |
 | `deployedModelNames` | `array` | Names of requested model deployments. |
-| `roleAssignmentIds` | `array` | Resource IDs of created role assignments (empty when no UAMI is attached). |
+| `uamiRoleAssignmentIds` | `array` | Resource IDs of role assignments granted to the supplied UAMIs (empty when no UAMI is attached). One entry per (UAMI, roleDefinitionId) pair. |
+| `servicePrincipalRoleAssignmentIds` | `array` | Resource IDs of role assignments granted to the supplied service principals (empty when no service principal is attached). One entry per (servicePrincipal, roleDefinitionId) pair. |
+| `userRoleAssignmentIds` | `array` | Resource IDs of role assignments granted to the supplied users (empty when no user is attached). One entry per (user, roleDefinitionId) pair. |
 
 ## Usage
 
@@ -116,4 +119,14 @@ infra/
         └── README.md                        # This file
 ```
 
-The scenario targets `subscription` scope, creates the resource group and Foundry resources, and deploys models sequentially. When an existing UAMI is provided through the optional parameters, it also grants inference permissions on the Foundry account to that UAMI.
+The scenario targets `subscription` scope, creates the resource group and Foundry resources, and deploys models sequentially. When any of the three identity arrays is non-empty, it also grants inference permissions on the Foundry account to those identities; one role assignment is emitted per (identity, roleDefinitionId) pair.
+
+### Looking up principal object IDs
+
+Each optional identity array expects IDs whose actual Microsoft Entra type matches the hardcoded `principalType` for that category. Placing an ID under the wrong category results in a deployment-time `UnmatchedPrincipalType` error from Azure RBAC.
+
+| Parameter | Expected Entra type | Retrieval example |
+| --- | --- | --- |
+| `existingServicePrincipalObjectIds` | `ServicePrincipal` (Enterprise Application object ID, not application/client ID) | `az ad sp show --id <application-id-or-name> --query id --output tsv` |
+| `existingUserObjectIds` | `User` | `az ad signed-in-user show --query id --output tsv` or `az ad user show --id <upn-or-objectid> --query id --output tsv` |
+| `existingUserAssignedIdentities` | `ServicePrincipal` (managed identity) | `az identity show --name <uami-name> --resource-group <rg-name>` |
