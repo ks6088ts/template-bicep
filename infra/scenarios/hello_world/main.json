@@ -1,12 +1,11 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
-  "languageVersion": "2.0",
   "contentVersion": "1.0.0.0",
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.41.2.15936",
-      "templateHash": "5128230183371109264"
+      "version": "0.43.8.12551",
+      "templateHash": "14889841079698589211"
     }
   },
   "parameters": {
@@ -26,7 +25,7 @@
   "variables": {
     "randomName": "[format('{0}-{1}', parameters('name'), uniqueString(subscription().id, parameters('location'), parameters('name')))]"
   },
-  "resources": {},
+  "resources": [],
   "outputs": {
     "randomName": {
       "type": "string",

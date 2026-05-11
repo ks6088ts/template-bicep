@@ -14,7 +14,7 @@ param location string
 //    VARIABLES
 // ------------------
 
-var randomName string = '${name}-${uniqueString(subscription().id, location, name)}'
+var randomName = '${name}-${uniqueString(subscription().id, location, name)}'
 
 // ------------------
 //    RESOURCES

@@ -25,6 +25,8 @@ jobs:
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
       TRIVY_VERSION: v0.69.3
+      AZURE_CLI_VERSION: 2.86.0
+      BICEP_CLI_VERSION: v0.43.8
     steps:
       - name: Log into Azure
         uses: azure/login@v2
@@ -42,7 +44,11 @@ jobs:
           version: ${{ env.TRIVY_VERSION }}
       - name: Install Azure CLI
         run: |
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+          sudo apt-get update
+          sudo apt-get install -y --allow-downgrades azure-cli=${{ env.AZURE_CLI_VERSION }}-1~$(lsb_release -cs)
+          az bicep install --version ${{ env.BICEP_CLI_VERSION }}
+          az --version
+          az bicep version
       - name: Run CI tests
         run: |
           make ci-test
