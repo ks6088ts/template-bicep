@@ -28,14 +28,11 @@ param publicNetworkAccess string = 'Enabled'
 @description('Disable local authentication (API keys) and require Entra ID authentication')
 param disableLocalAuth bool = true
 
-@description('Enable System Assigned Managed Identity for the Azure AI Foundry account')
-param enableSystemAssignedIdentity bool = false
-
 // ------------------
 //    RESOURCES
 // ------------------
 
-resource foundryAccountWithIdentity 'Microsoft.CognitiveServices/accounts@2026-03-01' = if (enableSystemAssignedIdentity) {
+resource foundryAccount 'Microsoft.CognitiveServices/accounts@2026-03-01' = {
   name: name
   location: location
   kind: 'AIServices'
@@ -43,28 +40,14 @@ resource foundryAccountWithIdentity 'Microsoft.CognitiveServices/accounts@2026-0
     name: 'S0'
   }
   tags: tags
-  properties: {
-    customSubDomainName: customSubDomainName
-    publicNetworkAccess: publicNetworkAccess
-    disableLocalAuth: disableLocalAuth
-  }
   identity: {
     type: 'SystemAssigned'
   }
-}
-
-resource foundryAccountWithoutIdentity 'Microsoft.CognitiveServices/accounts@2026-03-01' = if (!enableSystemAssignedIdentity) {
-  name: name
-  location: location
-  kind: 'AIServices'
-  sku: {
-    name: 'S0'
-  }
-  tags: tags
   properties: {
     customSubDomainName: customSubDomainName
     publicNetworkAccess: publicNetworkAccess
     disableLocalAuth: disableLocalAuth
+    allowProjectManagement: true
   }
 }
 
@@ -73,13 +56,13 @@ resource foundryAccountWithoutIdentity 'Microsoft.CognitiveServices/accounts@202
 // ------------------
 
 @description('The resource ID of the Azure AI Foundry account')
-output id string = enableSystemAssignedIdentity ? foundryAccountWithIdentity!.id : foundryAccountWithoutIdentity!.id
+output id string = foundryAccount.id
 
 @description('The name of the Azure AI Foundry account')
-output name string = enableSystemAssignedIdentity ? foundryAccountWithIdentity!.name : foundryAccountWithoutIdentity!.name
+output name string = foundryAccount.name
 
 @description('The endpoint of the Azure AI Foundry account')
-output endpoint string = enableSystemAssignedIdentity ? foundryAccountWithIdentity!.properties.endpoint : foundryAccountWithoutIdentity!.properties.endpoint
+output endpoint string = foundryAccount.properties.endpoint
 
-@description('The principal ID of the Azure AI Foundry account System Assigned Managed Identity (null when disabled)')
-output principalId string? = enableSystemAssignedIdentity ? foundryAccountWithIdentity!.identity.principalId : null
+@description('The principal ID of the Azure AI Foundry account System Assigned Managed Identity')
+output principalId string = foundryAccount.identity.principalId

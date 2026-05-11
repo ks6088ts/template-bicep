@@ -1,12 +1,12 @@
 ---
 title: Microsoft Foundry Scenario
-description: A Bicep scenario that provisions Azure AI Foundry account, project, model deployments, and role assignments for an existing User Assigned Managed Identity
+description: A Bicep scenario that provisions Azure AI Foundry account, project, model deployments, and optional role assignments for an existing User Assigned Managed Identity
 ms.date: 2026-05-11
 ---
 
 # Microsoft Foundry Scenario
 
-A Bicep scenario that provisions an Azure AI Foundry account (`Microsoft.CognitiveServices/accounts`), a Foundry project, model deployments, and scope-limited role assignments for an existing User Assigned Managed Identity (UAMI).
+A Bicep scenario that provisions an Azure AI Foundry account (`Microsoft.CognitiveServices/accounts`), a Foundry project, model deployments, and (optionally) scope-limited role assignments for an existing User Assigned Managed Identity (UAMI).
 
 ## Overview
 
@@ -16,17 +16,17 @@ This scenario targets the subscription scope and composes reusable modules:
 2. [`microsoft_foundry` module](../../modules/microsoft_foundry/main.bicep) — creates the Azure AI Foundry account.
 3. [`microsoft_foundry_project` module](../../modules/microsoft_foundry_project/main.bicep) — creates the Foundry project under the account.
 4. [`microsoft_foundry_model_deployment` module](../../modules/microsoft_foundry_model_deployment/main.bicep) — creates model deployments under the account.
-5. [`role_assignment` module](../../modules/role_assignment/main.bicep) — grants Foundry inference permissions to the existing UAMI at account scope.
+5. [`role_assignment` module](../../modules/role_assignment/main.bicep) — grants Foundry inference permissions to an existing UAMI at account scope (opt-in).
 
 The scenario layer is responsible for:
 
 * Deriving resource names from a single `name` parameter.
 * Composing inputs (default tags, model list, role definition IDs).
-* Referencing an existing UAMI by name and resource group.
+* Optionally referencing an existing UAMI by name and resource group; **by default, no UAMI is attached and no role assignments are created**.
 * Deploying models sequentially with `@batchSize(1)` to avoid concurrent deployment conflicts.
 * Surfacing module outputs to deployment consumers.
 
-By default, role assignment uses **Cognitive Services OpenAI User** (`5e0bd9bd-7b93-4f28-af87-19fc36ad61bd`) because it is the stable, minimal permission set for model inference calls against the Foundry account.
+When a UAMI is provided, role assignment defaults to **Cognitive Services OpenAI User** (`5e0bd9bd-7b93-4f28-af87-19fc36ad61bd`) because it is the stable, minimal permission set for model inference calls against the Foundry account.
 
 ## Parameters
 
@@ -35,10 +35,10 @@ By default, role assignment uses **Cognitive Services OpenAI User** (`5e0bd9bd-7
 | `name` | `string` | _(required)_ | Scenario name used to derive resource names. |
 | `location` | `string` | _(required)_ | Azure region for the resource group and Foundry resources. |
 | `tags` | `object` | `{ scenario: name, managedBy: 'bicep' }` | Tags applied to created resources. |
-| `existingUserAssignedIdentityName` | `string` | _(required)_ | Existing UAMI name to grant Foundry call permissions. |
-| `existingUserAssignedIdentityResourceGroupName` | `string` | _(required)_ | Resource group containing the existing UAMI. |
+| `existingUserAssignedIdentityName` | `string` | `''` | Optional. Existing UAMI name to grant Foundry call permissions. Leave empty to skip the role assignment. |
+| `existingUserAssignedIdentityResourceGroupName` | `string` | `''` | Optional. Resource group containing the existing UAMI. Required only when `existingUserAssignedIdentityName` is set. |
 | `models` | `array` | See `main.bicep` | Model deployments to create under the Foundry account. |
-| `roleDefinitionIds` | `array` | `['5e0bd9bd-7b93-4f28-af87-19fc36ad61bd']` | Role definition GUIDs to assign to the UAMI at Foundry account scope. |
+| `roleDefinitionIds` | `array` | `['5e0bd9bd-7b93-4f28-af87-19fc36ad61bd']` | Role definition GUIDs to assign to the UAMI at Foundry account scope (only applied when a UAMI is provided). |
 
 ## Outputs
 
@@ -53,7 +53,7 @@ By default, role assignment uses **Cognitive Services OpenAI User** (`5e0bd9bd-7
 | `foundryProjectId` | `string` | Resource ID of the created Foundry project. |
 | `foundryProjectName` | `string` | Name of the created Foundry project. |
 | `deployedModelNames` | `array` | Names of requested model deployments. |
-| `roleAssignmentIds` | `array` | Resource IDs of created role assignments. |
+| `roleAssignmentIds` | `array` | Resource IDs of created role assignments (empty when no UAMI is attached). |
 
 ## Usage
 
@@ -116,4 +116,4 @@ infra/
         └── README.md                        # This file
 ```
 
-The scenario targets `subscription` scope, creates the resource group and Foundry resources, deploys models sequentially, and then grants inference permissions on the Foundry account to the referenced existing UAMI.
+The scenario targets `subscription` scope, creates the resource group and Foundry resources, and deploys models sequentially. When an existing UAMI is provided through the optional parameters, it also grants inference permissions on the Foundry account to that UAMI.

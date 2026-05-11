@@ -4,8 +4,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.42.1.51946",
-      "templateHash": "1381253005405354872"
+      "version": "0.43.8.12551",
+      "templateHash": "11669603752617904403"
     }
   },
   "parameters": {
@@ -35,37 +35,23 @@
     },
     "existingUserAssignedIdentityName": {
       "type": "string",
-      "minLength": 3,
+      "defaultValue": "",
       "maxLength": 128,
       "metadata": {
-        "description": "The name of the existing User Assigned Managed Identity that will call Azure AI Foundry"
+        "description": "Optional. The name of an existing User Assigned Managed Identity (UAMI) to grant Azure AI Foundry inference permissions. Leave empty to skip the role assignment (no UAMI is attached by default)."
       }
     },
     "existingUserAssignedIdentityResourceGroupName": {
       "type": "string",
-      "minLength": 1,
+      "defaultValue": "",
       "maxLength": 90,
       "metadata": {
-        "description": "The resource group name where the existing User Assigned Managed Identity exists"
+        "description": "Optional. The resource group name where the existing User Assigned Managed Identity lives. Required only when existingUserAssignedIdentityName is provided."
       }
     },
     "models": {
       "type": "array",
       "defaultValue": [
-        {
-          "name": "gpt-5.4",
-          "modelName": "gpt-5.4",
-          "modelFormat": "OpenAI",
-          "skuName": "GlobalStandard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "gpt-5.4-nano",
-          "modelName": "gpt-5.4-nano",
-          "modelFormat": "OpenAI",
-          "skuName": "GlobalStandard",
-          "skuCapacity": 50
-        },
         {
           "name": "text-embedding-3-large",
           "modelName": "text-embedding-3-large",
@@ -82,7 +68,7 @@
         }
       ],
       "metadata": {
-        "description": "The list of model deployments to create in Azure AI Foundry"
+        "description": "The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs."
       }
     },
     "roleDefinitionIds": {
@@ -98,7 +84,8 @@
   "variables": {
     "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
     "foundryAccountName": "[take(toLower(replace(format('aif-{0}', parameters('name')), '_', '-')), 59)]",
-    "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]"
+    "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]",
+    "attachExistingUserAssignedIdentity": "[not(empty(parameters('existingUserAssignedIdentityName')))]"
   },
   "resources": [
     {
@@ -128,8 +115,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "10375022168103187164"
+              "version": "0.43.8.12551",
+              "templateHash": "13006231347032579543"
             }
           },
           "parameters": {
@@ -213,13 +200,12 @@
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "languageVersion": "2.0",
           "contentVersion": "1.0.0.0",
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "11338207591442137092"
+              "version": "0.43.8.12551",
+              "templateHash": "18281413229281920123"
             }
           },
           "parameters": {
@@ -270,18 +256,10 @@
               "metadata": {
                 "description": "Disable local authentication (API keys) and require Entra ID authentication"
               }
-            },
-            "enableSystemAssignedIdentity": {
-              "type": "bool",
-              "defaultValue": false,
-              "metadata": {
-                "description": "Enable System Assigned Managed Identity for the Azure AI Foundry account"
-              }
             }
           },
-          "resources": {
-            "foundryAccountWithIdentity": {
-              "condition": "[parameters('enableSystemAssignedIdentity')]",
+          "resources": [
+            {
               "type": "Microsoft.CognitiveServices/accounts",
               "apiVersion": "2026-03-01",
               "name": "[parameters('name')]",
@@ -291,62 +269,45 @@
                 "name": "S0"
               },
               "tags": "[parameters('tags')]",
-              "properties": {
-                "customSubDomainName": "[parameters('customSubDomainName')]",
-                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
-                "disableLocalAuth": "[parameters('disableLocalAuth')]"
-              },
               "identity": {
                 "type": "SystemAssigned"
-              }
-            },
-            "foundryAccountWithoutIdentity": {
-              "condition": "[not(parameters('enableSystemAssignedIdentity'))]",
-              "type": "Microsoft.CognitiveServices/accounts",
-              "apiVersion": "2026-03-01",
-              "name": "[parameters('name')]",
-              "location": "[parameters('location')]",
-              "kind": "AIServices",
-              "sku": {
-                "name": "S0"
               },
-              "tags": "[parameters('tags')]",
               "properties": {
                 "customSubDomainName": "[parameters('customSubDomainName')]",
                 "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
-                "disableLocalAuth": "[parameters('disableLocalAuth')]"
+                "disableLocalAuth": "[parameters('disableLocalAuth')]",
+                "allowProjectManagement": true
               }
             }
-          },
+          ],
           "outputs": {
             "id": {
               "type": "string",
               "metadata": {
                 "description": "The resource ID of the Azure AI Foundry account"
               },
-              "value": "[if(parameters('enableSystemAssignedIdentity'), resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), resourceId('Microsoft.CognitiveServices/accounts', parameters('name')))]"
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('name'))]"
             },
             "name": {
               "type": "string",
               "metadata": {
                 "description": "The name of the Azure AI Foundry account"
               },
-              "value": "[if(parameters('enableSystemAssignedIdentity'), parameters('name'), parameters('name'))]"
+              "value": "[parameters('name')]"
             },
             "endpoint": {
               "type": "string",
               "metadata": {
                 "description": "The endpoint of the Azure AI Foundry account"
               },
-              "value": "[if(parameters('enableSystemAssignedIdentity'), reference('foundryAccountWithIdentity').endpoint, reference('foundryAccountWithoutIdentity').endpoint)]"
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2026-03-01').endpoint]"
             },
             "principalId": {
               "type": "string",
-              "nullable": true,
               "metadata": {
-                "description": "The principal ID of the Azure AI Foundry account System Assigned Managed Identity (null when disabled)"
+                "description": "The principal ID of the Azure AI Foundry account System Assigned Managed Identity"
               },
-              "value": "[if(parameters('enableSystemAssignedIdentity'), reference('foundryAccountWithIdentity', '2026-03-01', 'full').identity.principalId, null())]"
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2026-03-01', 'full').identity.principalId]"
             }
           }
         }
@@ -388,8 +349,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "13382024662621289461"
+              "version": "0.43.8.12551",
+              "templateHash": "14892820478045566648"
             }
           },
           "parameters": {
@@ -447,6 +408,9 @@
               "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
               "properties": "[shallowMerge(createArray(createObject('displayName', parameters('displayName')), if(empty(parameters('projectDescription')), createObject(), createObject('description', parameters('projectDescription')))))]"
             }
           ],
@@ -520,8 +484,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "5808504932132325214"
+              "version": "0.43.8.12551",
+              "templateHash": "7243382622604451899"
             }
           },
           "parameters": {
@@ -636,6 +600,7 @@
         "name": "roleAssignments",
         "count": "[length(parameters('roleDefinitionIds'))]"
       },
+      "condition": "[variables('attachExistingUserAssignedIdentity')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "[take(format('{0}-role-{1}-deployment', parameters('name'), substring(parameters('roleDefinitionIds')[copyIndex()], 0, 8)), 64)]",
@@ -668,8 +633,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "17805555448297308216"
+              "version": "0.43.8.12551",
+              "templateHash": "15218140288436670077"
             }
           },
           "parameters": {
@@ -826,11 +791,11 @@
     "roleAssignmentIds": {
       "type": "array",
       "metadata": {
-        "description": "The resource IDs of role assignments granted to the existing User Assigned Managed Identity"
+        "description": "The resource IDs of role assignments granted to the existing User Assigned Managed Identity (empty when no UAMI is attached)"
       },
       "copy": {
-        "count": "[length(range(0, length(parameters('roleDefinitionIds'))))]",
-        "input": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-role-{1}-deployment', parameters('name'), substring(parameters('roleDefinitionIds')[range(0, length(parameters('roleDefinitionIds')))[copyIndex()]], 0, 8)), 64)), '2025-04-01').outputs.id.value]"
+        "count": "[length(range(0, if(variables('attachExistingUserAssignedIdentity'), length(parameters('roleDefinitionIds')), 0)))]",
+        "input": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-role-{1}-deployment', parameters('name'), substring(parameters('roleDefinitionIds')[range(0, if(variables('attachExistingUserAssignedIdentity'), length(parameters('roleDefinitionIds')), 0))[copyIndex()]], 0, 8)), 64)), '2025-04-01').outputs.id.value]"
       }
     }
   }

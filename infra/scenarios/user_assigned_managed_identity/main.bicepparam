@@ -1,6 +1,6 @@
 using 'main.bicep'
 
-param name = 'user_assigned_managed_identity'
+param name = 'userassignedmanagedidentity'
 param location = 'japaneast'
 param tags = {
   environment: 'dev'

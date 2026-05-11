@@ -40,6 +40,9 @@ resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-12-0
   name: name
   location: location
   tags: tags
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     displayName: displayName
     ...(empty(projectDescription) ? {} : {
