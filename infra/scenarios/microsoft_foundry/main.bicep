@@ -219,6 +219,7 @@ module applicationInsights '../../modules/application_insights/main.bicep' = if 
     workspaceResourceId: logAnalyticsWorkspaceResourceId
     tags: tags
   }
+  dependsOn: [logAnalyticsWorkspace]
 }
 
 module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' = if (enableObservability) {
@@ -229,6 +230,9 @@ module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' 
     workspaceResourceId: logAnalyticsWorkspaceResourceId
     targetResourceId: foundryAccount.outputs.id
   }
+  dependsOn: [
+    logAnalyticsWorkspace
+  ]
 }
 
 module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/main.bicep' = if (enableObservability) {
@@ -241,12 +245,14 @@ module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/
     parentProjectName: foundryProjectName
     category: 'AppInsights'
     target: applicationInsightsResourceId
-    credentialKey: reference(applicationInsightsResourceId, '2020-02-02').ConnectionString
+    credentialKey: applicationInsights.?outputs.connectionString ?? ''
     resourceId: applicationInsightsResourceId
     location: location
     isSharedToAll: false
   }
-  dependsOn: [foundryProject]
+  dependsOn: [
+    foundryProject
+  ]
 }
 
 @batchSize(1)
@@ -356,9 +362,7 @@ output logAnalyticsWorkspaceId string = enableObservability ? logAnalyticsWorksp
 output applicationInsightsId string = enableObservability ? applicationInsightsResourceId : ''
 
 @description('The connection string of the created Application Insights component (empty when observability is disabled)')
-output applicationInsightsConnectionString string = enableObservability
-  ? reference(applicationInsightsResourceId, '2020-02-02').ConnectionString
-  : ''
+output applicationInsightsConnectionString string = applicationInsights.?outputs.connectionString ?? ''
 
 @description('The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)')
 output uamiRoleAssignmentIds string[] = [for (pair, i) in uamiRolePairs: uamiRoleAssignments[i].outputs.id]
