@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "184112264665546968"
+      "templateHash": "1373774396382500151"
     }
   },
   "definitions": {
@@ -133,6 +133,13 @@
         "description": "Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication."
       }
     },
+    "enableObservability": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable Azure Monitor based observability resources (Log Analytics, Application Insights, diagnostic settings, and Foundry project tracing connection)."
+      }
+    },
     "models": {
       "type": "array",
       "defaultValue": [
@@ -187,6 +194,10 @@
     "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
     "foundryAccountName": "[take(toLower(replace(format('aif-{0}', parameters('name')), '_', '-')), 59)]",
     "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]",
+    "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
+    "applicationInsightsName": "[take(toLower(replace(format('appi-{0}', parameters('name')), '_', '-')), 260)]",
+    "foundryDiagnosticSettingsName": "[take(format('diag-{0}', variables('foundryAccountName')), 64)]",
+    "foundryAppInsightsConnectionName": "[take(format('appinsights-{0}', variables('foundryProjectName')), 64)]",
     "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
     "servicePrincipalRolePairs": "[flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
     "userRolePairs": "[flatten(map(parameters('existingUserObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]"
@@ -552,6 +563,479 @@
       },
       "dependsOn": [
         "foundryAccount"
+      ]
+    },
+    "logAnalyticsWorkspace": {
+      "condition": "[parameters('enableObservability')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-law-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('logAnalyticsWorkspaceName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "15282767757597819840"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 63,
+              "metadata": {
+                "description": "The name of the Log Analytics workspace"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Log Analytics workspace will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Log Analytics workspace"
+              }
+            },
+            "retentionInDays": {
+              "type": "int",
+              "defaultValue": 30,
+              "minValue": 30,
+              "maxValue": 730,
+              "metadata": {
+                "description": "The retention period (days) for workspace data"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": "[parameters('retentionInDays')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace"
+              },
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Log Analytics workspace"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "applicationInsights": {
+      "condition": "[parameters('enableObservability')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-appi-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('applicationInsightsName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "workspaceResourceId": {
+            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "14177430626936703635"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 260,
+              "metadata": {
+                "description": "The name of the Application Insights component"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Application Insights component will be created"
+              }
+            },
+            "workspaceResourceId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace used for workspace-based ingestion"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Application Insights component"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "kind": "web",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[parameters('workspaceResourceId')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Application Insights component"
+              },
+              "value": "[resourceId('Microsoft.Insights/components', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Application Insights component"
+              },
+              "value": "[parameters('name')]"
+            },
+            "connectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "The connection string of the Application Insights component"
+              },
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('name')), '2020-02-02').ConnectionString]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalyticsWorkspace"
+      ]
+    },
+    "foundryDiagnosticSettings": {
+      "condition": "[parameters('enableObservability')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-diag-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('foundryDiagnosticSettingsName')]"
+          },
+          "workspaceResourceId": {
+            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "targetAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "15208326580891933316"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "metadata": {
+                "description": "The name of the diagnostic settings resource"
+              }
+            },
+            "workspaceResourceId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace destination"
+              }
+            },
+            "targetAccountName": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to"
+              }
+            },
+            "logs": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "categoryGroup": "allLogs",
+                  "enabled": true
+                }
+              ],
+              "metadata": {
+                "description": "The diagnostic log settings to configure"
+              }
+            },
+            "metrics": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "category": "AllMetrics",
+                  "enabled": true
+                }
+              ],
+              "metadata": {
+                "description": "The diagnostic metric settings to configure"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName'))]",
+              "name": "[parameters('name')]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the diagnostic settings resource"
+              },
+              "value": "[extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName')), 'Microsoft.Insights/diagnosticSettings', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the diagnostic settings resource"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "foundryAccount",
+        "logAnalyticsWorkspace"
+      ]
+    },
+    "foundryAppInsightsConnection": {
+      "condition": "[parameters('enableObservability')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-appinsights-connection-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "parentAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "name": {
+            "value": "[variables('foundryAppInsightsConnectionName')]"
+          },
+          "parentProjectName": {
+            "value": "[variables('foundryProjectName')]"
+          },
+          "category": {
+            "value": "AppInsights"
+          },
+          "target": {
+            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "credentialKey": {
+            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'connectionString', 'value'), '')]"
+          },
+          "resourceId": {
+            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "isSharedToAll": {
+            "value": false
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "14748774820262903127"
+            }
+          },
+          "parameters": {
+            "parentAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the parent Azure AI Foundry account"
+              }
+            },
+            "parentProjectName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The name of the parent Azure AI Foundry project"
+              }
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The name of the connection resource"
+              }
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The connection category for the Foundry project"
+              }
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The target endpoint or resource ID for the connection"
+              }
+            },
+            "credentialKey": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional credential key used for ApiKey-based connections"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region of the connected resource"
+              }
+            },
+            "resourceId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The Azure resource ID of the connected resource"
+              }
+            },
+            "isSharedToAll": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Whether the connection is shared to all resources in the project"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts/projects/connections",
+              "apiVersion": "2025-12-01",
+              "name": "[format('{0}/{1}/{2}', parameters('parentAccountName'), parameters('parentProjectName'), parameters('name'))]",
+              "properties": "[shallowMerge(createArray(createObject('authType', 'ApiKey', 'category', parameters('category'), 'target', parameters('target')), if(empty(parameters('credentialKey')), createObject(), createObject('credentials', createObject('key', parameters('credentialKey')))), createObject('isSharedToAll', parameters('isSharedToAll'), 'metadata', createObject('ApiType', 'Azure', 'ResourceId', parameters('resourceId'), 'location', parameters('location')))))]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Foundry project connection"
+              },
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects/connections', parameters('parentAccountName'), parameters('parentProjectName'), parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Foundry project connection"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "applicationInsights",
+        "foundryProject"
       ]
     },
     "modelDeployments": {
@@ -1154,6 +1638,27 @@
         "count": "[length(parameters('models'))]",
         "input": "[parameters('models')[copyIndex()].name]"
       }
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Log Analytics workspace (empty when observability is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+    },
+    "applicationInsightsId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Application Insights component (empty when observability is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
+    },
+    "applicationInsightsConnectionString": {
+      "type": "string",
+      "metadata": {
+        "description": "The connection string of the created Application Insights component (empty when observability is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'connectionString', 'value'), '')]"
     },
     "uamiRoleAssignmentIds": {
       "type": "array",
