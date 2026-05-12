@@ -61,6 +61,9 @@ param existingUserObjectIds string[] = []
 @description('Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication.')
 param disableLocalAuth bool = true
 
+@description('Enable Azure Monitor based observability resources (Log Analytics, Application Insights, diagnostic settings, and Foundry project tracing connection).')
+param enableObservability bool = false
+
 @description('The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs.')
 param models array = [
   {
@@ -106,6 +109,10 @@ param roleDefinitionIds string[] = [
 var resourceGroupName = 'rg-${name}'
 var foundryAccountName = take(toLower(replace('aif-${name}', '_', '-')), 59)
 var foundryProjectName = take('proj-${name}', 64)
+var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
+var applicationInsightsName = take(toLower(replace('appi-${name}', '_', '-')), 260)
+var foundryDiagnosticSettingsName = take('diag-${foundryAccountName}', 64)
+var foundryAppInsightsConnectionName = take('appinsights-${foundryProjectName}', 64)
 
 // Cross-product each identity array with `roleDefinitionIds` into a flat list of struct pairs.
 // `map`/`flatten` keep the cross product readable and naturally produce an empty list when the
@@ -186,6 +193,58 @@ module foundryProject '../../modules/microsoft_foundry_project/main.bicep' = {
     tags: tags
   }
   dependsOn: [foundryAccount]
+}
+
+module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' = if (enableObservability) {
+  name: take('${name}-law-deployment', 64)
+  scope: az.resourceGroup(resourceGroupName)
+  params: {
+    #disable-next-line BCP334
+    name: logAnalyticsWorkspaceName
+    location: location
+    tags: tags
+  }
+  dependsOn: [resourceGroup]
+}
+
+module applicationInsights '../../modules/application_insights/main.bicep' = if (enableObservability) {
+  name: take('${name}-appi-deployment', 64)
+  scope: az.resourceGroup(resourceGroupName)
+  params: {
+    #disable-next-line BCP334
+    name: applicationInsightsName
+    location: location
+    workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
+    tags: tags
+  }
+}
+
+module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' = if (enableObservability) {
+  name: take('${name}-diag-deployment', 64)
+  scope: az.resourceGroup(resourceGroupName)
+  params: {
+    name: foundryDiagnosticSettingsName
+    workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
+    targetResourceId: foundryAccount.outputs.id
+  }
+}
+
+module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/main.bicep' = if (enableObservability) {
+  name: take('${name}-appinsights-connection-deployment', 64)
+  scope: az.resourceGroup(resourceGroupName)
+  params: {
+    #disable-next-line BCP334
+    parentAccountName: foundryAccountName
+    name: foundryAppInsightsConnectionName
+    parentProjectName: foundryProjectName
+    category: 'AppInsights'
+    target: applicationInsights.?outputs.id ?? ''
+    credentialKey: applicationInsights.?outputs.connectionString ?? ''
+    resourceId: applicationInsights.?outputs.id ?? ''
+    location: location
+    isSharedToAll: false
+  }
+  dependsOn: [foundryProject]
 }
 
 @batchSize(1)
@@ -287,6 +346,15 @@ output foundryProjectName string = foundryProject.outputs.name
 
 @description('The names of model deployments requested by this scenario')
 output deployedModelNames array = [for model in models: model.name]
+
+@description('The resource ID of the created Log Analytics workspace (empty when observability is disabled)')
+output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.?outputs.id ?? ''
+
+@description('The resource ID of the created Application Insights component (empty when observability is disabled)')
+output applicationInsightsId string = applicationInsights.?outputs.id ?? ''
+
+@description('The connection string of the created Application Insights component (empty when observability is disabled)')
+output applicationInsightsConnectionString string = applicationInsights.?outputs.connectionString ?? ''
 
 @description('The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)')
 output uamiRoleAssignmentIds string[] = [for (pair, i) in uamiRolePairs: uamiRoleAssignments[i].outputs.id]

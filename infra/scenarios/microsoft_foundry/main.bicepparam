@@ -15,6 +15,12 @@ param tags = {
 // Enable API key based authentication on the Foundry account. Set to true to require Entra ID only.
 param disableLocalAuth = false
 
+
+// Optional: enable observability resources (Log Analytics, Application Insights, diagnostic settings,
+// and Foundry project tracing connection). Leave commented out (or set to false) to preserve the
+// existing behavior without observability resources.
+// param enableObservability = true
+
 // Optional: attach existing User Assigned Managed Identities (UAMI) to receive Foundry inference
 // role assignments. Leave commented out (or set to []) to keep the default behavior of skipping
 // the role assignment (no UAMI is attached).
