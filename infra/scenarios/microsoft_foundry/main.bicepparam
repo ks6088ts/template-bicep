@@ -19,7 +19,7 @@ param disableLocalAuth = false
 // Optional: enable observability resources (Log Analytics, Application Insights, diagnostic settings,
 // and Foundry project tracing connection). Leave commented out (or set to false) to preserve the
 // existing behavior without observability resources.
-// param enableObservability = true
+param enableObservability = true
 
 // Optional: attach existing User Assigned Managed Identities (UAMI) to receive Foundry inference
 // role assignments. Leave commented out (or set to []) to keep the default behavior of skipping

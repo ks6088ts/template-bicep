@@ -11,9 +11,9 @@ param name string
 @minLength(1)
 param workspaceResourceId string
 
-@description('The target resource ID where diagnostic settings will be applied')
+@description('The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to')
 @minLength(1)
-param targetResourceId string
+param targetAccountName string
 
 @description('The diagnostic log settings to configure')
 param logs array = [
@@ -32,78 +32,25 @@ param metrics array = [
 ]
 
 // ------------------
+//    EXISTING RESOURCES
+// ------------------
+
+resource targetAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+  #disable-next-line BCP334
+  name: targetAccountName
+}
+
+// ------------------
 //    RESOURCES
 // ------------------
 
-#disable-next-line no-deployments-resources
-resource diagnosticSettingsDeployment 'Microsoft.Resources/deployments@2024-03-01' = {
-  name: take('diag-${uniqueString(targetResourceId, name)}', 64)
+resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  scope: targetAccount
+  name: name
   properties: {
-    mode: 'Incremental'
-    expressionEvaluationOptions: {
-      scope: 'inner'
-    }
-    parameters: {
-      name: {
-        value: name
-      }
-      workspaceResourceId: {
-        value: workspaceResourceId
-      }
-      targetResourceId: {
-        value: targetResourceId
-      }
-      logs: {
-        value: logs
-      }
-      metrics: {
-        value: metrics
-      }
-    }
-    template: {
-      '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
-      contentVersion: '1.0.0.0'
-      parameters: {
-        name: {
-          type: 'string'
-        }
-        workspaceResourceId: {
-          type: 'string'
-        }
-        targetResourceId: {
-          type: 'string'
-        }
-        logs: {
-          type: 'array'
-        }
-        metrics: {
-          type: 'array'
-        }
-      }
-      resources: [
-        {
-          type: 'Microsoft.Insights/diagnosticSettings'
-          apiVersion: '2021-05-01-preview'
-          scope: '[parameters(\'targetResourceId\')]'
-          name: '[parameters(\'name\')]'
-          properties: {
-            workspaceId: '[parameters(\'workspaceResourceId\')]'
-            logs: '[parameters(\'logs\')]'
-            metrics: '[parameters(\'metrics\')]'
-          }
-        }
-      ]
-      outputs: {
-        id: {
-          type: 'string'
-          value: '[extensionResourceId(parameters(\'targetResourceId\'), \'Microsoft.Insights/diagnosticSettings\', parameters(\'name\'))]'
-        }
-        name: {
-          type: 'string'
-          value: '[parameters(\'name\')]'
-        }
-      }
-    }
+    workspaceId: workspaceResourceId
+    logs: logs
+    metrics: metrics
   }
 }
 
@@ -112,7 +59,7 @@ resource diagnosticSettingsDeployment 'Microsoft.Resources/deployments@2024-03-0
 // ------------------
 
 @description('The resource ID of the diagnostic settings resource')
-output id string = diagnosticSettingsDeployment.properties.outputs.id.value
+output id string = diagnosticSettings.id
 
 @description('The name of the diagnostic settings resource')
-output name string = diagnosticSettingsDeployment.properties.outputs.name.value
+output name string = diagnosticSettings.name
