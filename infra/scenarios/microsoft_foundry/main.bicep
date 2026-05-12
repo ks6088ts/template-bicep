@@ -111,6 +111,8 @@ var foundryAccountName = take(toLower(replace('aif-${name}', '_', '-')), 59)
 var foundryProjectName = take('proj-${name}', 64)
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var applicationInsightsName = take(toLower(replace('appi-${name}', '_', '-')), 260)
+var logAnalyticsWorkspaceResourceId = resourceId(resourceGroupName, 'Microsoft.OperationalInsights/workspaces', logAnalyticsWorkspaceName)
+var applicationInsightsResourceId = resourceId(resourceGroupName, 'Microsoft.Insights/components', applicationInsightsName)
 var foundryDiagnosticSettingsName = take('diag-${foundryAccountName}', 64)
 var foundryAppInsightsConnectionName = take('appinsights-${foundryProjectName}', 64)
 
@@ -214,7 +216,7 @@ module applicationInsights '../../modules/application_insights/main.bicep' = if 
     #disable-next-line BCP334
     name: applicationInsightsName
     location: location
-    workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
+    workspaceResourceId: logAnalyticsWorkspaceResourceId
     tags: tags
   }
 }
@@ -224,7 +226,7 @@ module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' 
   scope: az.resourceGroup(resourceGroupName)
   params: {
     name: foundryDiagnosticSettingsName
-    workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
+    workspaceResourceId: logAnalyticsWorkspaceResourceId
     targetResourceId: foundryAccount.outputs.id
   }
 }
@@ -238,9 +240,9 @@ module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/
     name: foundryAppInsightsConnectionName
     parentProjectName: foundryProjectName
     category: 'AppInsights'
-    target: applicationInsights.?outputs.id ?? ''
-    credentialKey: applicationInsights.?outputs.connectionString ?? ''
-    resourceId: applicationInsights.?outputs.id ?? ''
+    target: applicationInsightsResourceId
+    credentialKey: reference(applicationInsightsResourceId, '2020-02-02').ConnectionString
+    resourceId: applicationInsightsResourceId
     location: location
     isSharedToAll: false
   }
@@ -348,13 +350,15 @@ output foundryProjectName string = foundryProject.outputs.name
 output deployedModelNames array = [for model in models: model.name]
 
 @description('The resource ID of the created Log Analytics workspace (empty when observability is disabled)')
-output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.?outputs.id ?? ''
+output logAnalyticsWorkspaceId string = enableObservability ? logAnalyticsWorkspaceResourceId : ''
 
 @description('The resource ID of the created Application Insights component (empty when observability is disabled)')
-output applicationInsightsId string = applicationInsights.?outputs.id ?? ''
+output applicationInsightsId string = enableObservability ? applicationInsightsResourceId : ''
 
 @description('The connection string of the created Application Insights component (empty when observability is disabled)')
-output applicationInsightsConnectionString string = applicationInsights.?outputs.connectionString ?? ''
+output applicationInsightsConnectionString string = enableObservability
+  ? reference(applicationInsightsResourceId, '2020-02-02').ConnectionString
+  : ''
 
 @description('The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)')
 output uamiRoleAssignmentIds string[] = [for (pair, i) in uamiRolePairs: uamiRoleAssignments[i].outputs.id]

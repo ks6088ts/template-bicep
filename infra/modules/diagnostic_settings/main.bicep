@@ -35,18 +35,75 @@ param metrics array = [
 //    RESOURCES
 // ------------------
 
-#disable-next-line BCP081
-resource targetResource 'Microsoft.Resources/resources@2021-04-01' existing = {
-  name: targetResourceId
-}
-
-resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  scope: targetResource
-  name: name
+#disable-next-line no-deployments-resources
+resource diagnosticSettingsDeployment 'Microsoft.Resources/deployments@2024-03-01' = {
+  name: take('diag-${uniqueString(targetResourceId, name)}', 64)
   properties: {
-    workspaceId: workspaceResourceId
-    logs: logs
-    metrics: metrics
+    mode: 'Incremental'
+    expressionEvaluationOptions: {
+      scope: 'inner'
+    }
+    parameters: {
+      name: {
+        value: name
+      }
+      workspaceResourceId: {
+        value: workspaceResourceId
+      }
+      targetResourceId: {
+        value: targetResourceId
+      }
+      logs: {
+        value: logs
+      }
+      metrics: {
+        value: metrics
+      }
+    }
+    template: {
+      '$schema': 'https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#'
+      contentVersion: '1.0.0.0'
+      parameters: {
+        name: {
+          type: 'string'
+        }
+        workspaceResourceId: {
+          type: 'string'
+        }
+        targetResourceId: {
+          type: 'string'
+        }
+        logs: {
+          type: 'array'
+        }
+        metrics: {
+          type: 'array'
+        }
+      }
+      resources: [
+        {
+          type: 'Microsoft.Insights/diagnosticSettings'
+          apiVersion: '2021-05-01-preview'
+          scope: '[parameters(\'targetResourceId\')]'
+          name: '[parameters(\'name\')]'
+          properties: {
+            workspaceId: '[parameters(\'workspaceResourceId\')]'
+            logs: '[parameters(\'logs\')]'
+            metrics: '[parameters(\'metrics\')]'
+          }
+        }
+      ]
+      outputs: {
+        id: {
+          type: 'string'
+          value: '[extensionResourceId(parameters(\'targetResourceId\'), \'Microsoft.Insights/diagnosticSettings\', parameters(\'name\'))]'
+        }
+        name: {
+          type: 'string'
+          value: '[parameters(\'name\')]'
+        }
+      }
+    }
   }
 }
 
@@ -55,7 +112,7 @@ resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
 // ------------------
 
 @description('The resource ID of the diagnostic settings resource')
-output id string = diagnosticSettings.id
+output id string = diagnosticSettingsDeployment.properties.outputs.id.value
 
 @description('The name of the diagnostic settings resource')
-output name string = diagnosticSettings.name
+output name string = diagnosticSettingsDeployment.properties.outputs.name.value
