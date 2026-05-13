@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "1373774396382500151"
+      "templateHash": "1640566020095716228"
     }
   },
   "definitions": {
@@ -803,7 +803,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "15208326580891933316"
+              "templateHash": "12549242387600695814"
             }
           },
           "parameters": {
@@ -824,9 +824,16 @@
             },
             "targetAccountName": {
               "type": "string",
-              "minLength": 1,
+              "defaultValue": "",
               "metadata": {
-                "description": "The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to"
+                "description": "The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to. Provide either this or targetServerName."
+              }
+            },
+            "targetServerName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The name of the existing Azure Database for PostgreSQL Flexible Server that diagnostic settings will be applied to. Provide either this or targetAccountName."
               }
             },
             "logs": {
@@ -856,9 +863,22 @@
           },
           "resources": [
             {
+              "condition": "[not(empty(parameters('targetAccountName')))]",
               "type": "Microsoft.Insights/diagnosticSettings",
               "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName'))]",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[parameters('name')]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('targetServerName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder'))]",
               "name": "[parameters('name')]",
               "properties": {
                 "workspaceId": "[parameters('workspaceResourceId')]",
@@ -873,14 +893,14 @@
               "metadata": {
                 "description": "The resource ID of the diagnostic settings resource"
               },
-              "value": "[extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName')), 'Microsoft.Insights/diagnosticSettings', parameters('name'))]"
+              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), extensionResourceId(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), if(not(empty(parameters('targetAccountName'))), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), '')]"
             },
             "name": {
               "type": "string",
               "metadata": {
                 "description": "The name of the diagnostic settings resource"
               },
-              "value": "[parameters('name')]"
+              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), parameters('name'), null()), if(not(empty(parameters('targetAccountName'))), parameters('name'), null())), parameters('name'))]"
             }
           }
         }
