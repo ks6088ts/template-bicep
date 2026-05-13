@@ -11,23 +11,31 @@ param tags = {
   CostControl: 'Ignore'
 }
 
-// Set the Entra ID administrator for the PostgreSQL Flexible Server.
-// Replace the placeholder values with the actual objectId, principalName, and tenantId.
-// To retrieve the signed-in user's information, run:
+// Microsoft Entra ID administrator for the PostgreSQL Flexible Server.
+//
+// By default this parameter is omitted, and the scenario registers the
+// principal executing the deployment (i.e. `deployer()`) as the administrator.
+// That lets `make deploy SCENARIO=postgresql_flexible_server` succeed with no
+// manual edits to this file.
+//
+// To override with a specific user / group / service principal, uncomment the
+// block below and replace the placeholder values. To retrieve the signed-in
+// user's information, run:
 //   az ad signed-in-user show --query "{objectId:id, principalName:userPrincipalName, tenantId:tenantId}" -o json
-param entraAdministrator = {
-  objectId: '00000000-0000-0000-0000-000000000000'
-  principalName: 'admin@contoso.onmicrosoft.com'
-  principalType: 'User'
-  tenantId: '00000000-0000-0000-0000-000000000000'
-}
+// param entraAdministrator = {
+//   objectId: '00000000-0000-0000-0000-000000000000'
+//   principalName: 'admin@contoso.onmicrosoft.com'
+//   principalType: 'User'
+//   tenantId: '00000000-0000-0000-0000-000000000000'
+// }
 
 // Optional: enable observability resources (Log Analytics workspace and diagnostic settings).
 // Leave commented out (or set to false) to preserve the default behavior without observability.
 param enableObservability = true
 
 // Optional: override PostgreSQL version, SKU, and storage. Defaults from main.bicep are used when omitted.
-// param version = '16'
+// The default PostgreSQL major version is '18' to match the pgvector/pgvector:pg18 reference container image.
+// param version = '18'
 // param skuName = 'Standard_B1ms'
 // param skuTier = 'Burstable'
 // param storageSizeGB = 32

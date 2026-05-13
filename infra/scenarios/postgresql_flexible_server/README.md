@@ -8,6 +8,8 @@ ms.date: 2026-05-13
 
 A Bicep scenario that provisions an Azure Database for PostgreSQL Flexible Server (`Microsoft.DBforPostgreSQL/flexibleServers`) with Microsoft Entra ID-only authentication (password authentication disabled), an optional pgvector extension for vector similarity search, configurable firewall rules, initial databases, and optionally Azure Monitor-based observability (Log Analytics workspace and diagnostic settings).
 
+By default this scenario provisions a managed environment equivalent to the [`pgvector/pgvector:pg18`](https://hub.docker.com/r/pgvector/pgvector) Docker image: PostgreSQL major version `18` with the `pgvector` extension allow-listed (`azure.extensions = VECTOR`) so it can be enabled with `CREATE EXTENSION vector;` against any database created on the server.
+
 ## Overview
 
 This scenario targets the subscription scope and composes reusable modules:
@@ -32,8 +34,8 @@ The scenario layer is responsible for:
 | `name` | `string` | _(required)_ | Scenario name used to derive resource names. |
 | `location` | `string` | _(required)_ | Azure region for the resource group and PostgreSQL resources. |
 | `tags` | `object` | `{ scenario: name, managedBy: 'bicep' }` | Tags applied to created resources. |
-| `entraAdministrator` | `object` | _(required)_ | Microsoft Entra ID administrator. Fields: `objectId`, `principalName`, `principalType` (`'User'`\|`'Group'`\|`'ServicePrincipal'`), `tenantId`. |
-| `version` | `string` | `'16'` | PostgreSQL major version. |
+| `entraAdministrator` | `object?` | _(deployer())_ | Microsoft Entra ID administrator. When omitted, the principal executing the deployment (returned by the Bicep [`deployer()`](https://learn.microsoft.com/azure/azure-resource-manager/bicep/bicep-functions-deployment#deployer) function) is registered as the administrator. Fields when overriding: `objectId`, `principalName`, `principalType` (`'User'`\|`'Group'`\|`'ServicePrincipal'`), `tenantId`. |
+| `version` | `string` | `'18'` | PostgreSQL major version. Defaults to `18` to match the [`pgvector/pgvector:pg18`](https://hub.docker.com/r/pgvector/pgvector) reference container image. |
 | `skuName` | `string` | `'Standard_B1ms'` | Compute SKU name. |
 | `skuTier` | `string` | `'Burstable'` | SKU tier (`'Burstable'`, `'GeneralPurpose'`, `'MemoryOptimized'`). |
 | `storageSizeGB` | `int` | `32` | Storage size in GB. |
@@ -57,11 +59,7 @@ The scenario layer is responsible for:
 
 ## Usage
 
-Before deploying, update `main.bicepparam` with the actual Entra ID administrator values. Retrieve them with:
-
-```bash
-az ad signed-in-user show --query "{objectId:id, principalName:userPrincipalName, tenantId:tenantId}" -o json
-```
+The bundled `main.bicepparam` is ready to deploy as-is: by default the scenario registers the principal executing the deployment (obtained via the Bicep [`deployer()`](https://learn.microsoft.com/azure/azure-resource-manager/bicep/bicep-functions-deployment#deployer) function) as the Microsoft Entra administrator, so no manual edits are required.
 
 Deploy with the bundled `bicepparam` file:
 
@@ -76,6 +74,12 @@ Or with the repository `Makefile`:
 
 ```bash
 make deploy SCENARIO=postgresql_flexible_server
+```
+
+To register a different administrator (for example a security group or a service principal), uncomment and edit the `param entraAdministrator = { ... }` block in `main.bicepparam`. To look up the signed-in user's values, run:
+
+```bash
+az ad signed-in-user show --query "{objectId:id, principalName:userPrincipalName, tenantId:tenantId}" -o json
 ```
 
 To enable observability, set `param enableObservability = true` in `main.bicepparam` (already the default in the bundled file). This deploys a Log Analytics workspace and configures diagnostic settings to send all PostgreSQL server logs and metrics to it.

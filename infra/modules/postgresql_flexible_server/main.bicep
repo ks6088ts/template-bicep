@@ -13,8 +13,8 @@ param location string
 @description('Tags applied to the PostgreSQL Flexible Server')
 param tags object = {}
 
-@description('PostgreSQL major version')
-param version string = '16'
+@description('PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image.')
+param version string = '18'
 
 @description('The compute SKU name for the flexible server')
 param skuName string = 'Standard_B1ms'
@@ -54,7 +54,7 @@ param enablePgvector bool = true
 //    RESOURCES
 // ------------------
 
-resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
+resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-08-01' = {
   name: name
   location: location
   tags: tags
@@ -80,7 +80,7 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' =
   }
 }
 
-resource entraAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2024-08-01' = {
+resource entraAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2025-08-01' = {
   parent: postgresServer
   name: entraAdministrator.objectId
   properties: {
@@ -90,7 +90,7 @@ resource entraAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@20
   }
 }
 
-resource firewallRuleResources 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2024-08-01' = [
+resource firewallRuleResources 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2025-08-01' = [
   for rule in firewallRules: {
     parent: postgresServer
     name: rule.name
@@ -101,7 +101,7 @@ resource firewallRuleResources 'Microsoft.DBforPostgreSQL/flexibleServers/firewa
   }
 ]
 
-resource databaseResources 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2024-08-01' = [
+resource databaseResources 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2025-08-01' = [
   for db in databases: {
     parent: postgresServer
     name: db.name
@@ -112,7 +112,7 @@ resource databaseResources 'Microsoft.DBforPostgreSQL/flexibleServers/databases@
   }
 ]
 
-resource pgvectorConfig 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2024-08-01' = if (enablePgvector) {
+resource pgvectorConfig 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2025-08-01' = if (enablePgvector) {
   parent: postgresServer
   name: 'azure.extensions'
   properties: {

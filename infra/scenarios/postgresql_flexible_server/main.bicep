@@ -18,7 +18,7 @@ param tags object = {
   managedBy: 'bicep'
 }
 
-@description('Microsoft Entra ID administrator for the PostgreSQL Flexible Server')
+@description('Microsoft Entra ID administrator for the PostgreSQL Flexible Server. When omitted, the principal executing the deployment (returned by deployer()) is registered as the administrator so the scenario can be deployed without any manual edits.')
 param entraAdministrator {
   @description('The object ID (principal ID) of the Entra principal')
   objectId: string
@@ -31,10 +31,10 @@ param entraAdministrator {
 
   @description('The tenant ID for the Entra administrator')
   tenantId: string
-}
+}?
 
-@description('PostgreSQL major version')
-param version string = '16'
+@description('PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image.')
+param version string = '18'
 
 @description('The compute SKU name for the flexible server')
 param skuName string = 'Standard_B1ms'
@@ -77,6 +77,19 @@ var postgresServerName = take(toLower(replace('psql-${name}', '_', '-')), 63)
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var postgresDiagnosticSettingsName = take('diag-${postgresServerName}', 256)
 
+// Resolve the effective Microsoft Entra administrator.
+// When the caller does not pass `entraAdministrator`, fall back to the principal
+// executing the deployment (the `deployer()` function), so the scenario can be
+// deployed with no manual parameter edits.
+var deployerInfo = deployer()
+var deployerUserPrincipalName = deployerInfo.?userPrincipalName ?? ''
+var effectiveEntraAdministrator = entraAdministrator ?? {
+  objectId: deployerInfo.objectId
+  principalName: empty(deployerUserPrincipalName) ? deployerInfo.objectId : deployerUserPrincipalName
+  principalType: empty(deployerUserPrincipalName) ? 'ServicePrincipal' : 'User'
+  tenantId: deployerInfo.tenantId
+}
+
 // ------------------
 //    RESOURCES
 // ------------------
@@ -102,7 +115,7 @@ module postgresServer '../../modules/postgresql_flexible_server/main.bicep' = {
     skuName: skuName
     skuTier: skuTier
     storageSizeGB: storageSizeGB
-    entraAdministrator: entraAdministrator
+    entraAdministrator: effectiveEntraAdministrator
     firewallRules: firewallRules
     databases: databases
     enablePgvector: enablePgvector

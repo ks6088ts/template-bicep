@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "4418194995173081982"
+      "templateHash": "5703160322773700439"
     }
   },
   "parameters": {
@@ -67,15 +67,16 @@
           }
         }
       },
+      "nullable": true,
       "metadata": {
-        "description": "Microsoft Entra ID administrator for the PostgreSQL Flexible Server"
+        "description": "Microsoft Entra ID administrator for the PostgreSQL Flexible Server. When omitted, the principal executing the deployment (returned by deployer()) is registered as the administrator so the scenario can be deployed without any manual edits."
       }
     },
     "version": {
       "type": "string",
-      "defaultValue": "16",
+      "defaultValue": "18",
       "metadata": {
-        "description": "PostgreSQL major version"
+        "description": "PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image."
       }
     },
     "skuName": {
@@ -147,7 +148,10 @@
     "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
     "postgresServerName": "[take(toLower(replace(format('psql-{0}', parameters('name')), '_', '-')), 63)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
-    "postgresDiagnosticSettingsName": "[take(format('diag-{0}', variables('postgresServerName')), 256)]"
+    "postgresDiagnosticSettingsName": "[take(format('diag-{0}', variables('postgresServerName')), 256)]",
+    "deployerInfo": "[deployer()]",
+    "deployerUserPrincipalName": "[coalesce(tryGet(variables('deployerInfo'), 'userPrincipalName'), '')]",
+    "effectiveEntraAdministrator": "[coalesce(parameters('entraAdministrator'), createObject('objectId', variables('deployerInfo').objectId, 'principalName', if(empty(variables('deployerUserPrincipalName')), variables('deployerInfo').objectId, variables('deployerUserPrincipalName')), 'principalType', if(empty(variables('deployerUserPrincipalName')), 'ServicePrincipal', 'User'), 'tenantId', variables('deployerInfo').tenantId))]"
   },
   "resources": {
     "resourceGroup": {
@@ -272,7 +276,7 @@
             "value": "[parameters('storageSizeGB')]"
           },
           "entraAdministrator": {
-            "value": "[parameters('entraAdministrator')]"
+            "value": "[variables('effectiveEntraAdministrator')]"
           },
           "firewallRules": {
             "value": "[parameters('firewallRules')]"
@@ -292,7 +296,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "16751158317552894216"
+              "templateHash": "11018863908357162830"
             }
           },
           "parameters": {
@@ -319,9 +323,9 @@
             },
             "version": {
               "type": "string",
-              "defaultValue": "16",
+              "defaultValue": "18",
               "metadata": {
-                "description": "PostgreSQL major version"
+                "description": "PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image."
               }
             },
             "skuName": {
@@ -412,7 +416,7 @@
           "resources": {
             "postgresServer": {
               "type": "Microsoft.DBforPostgreSQL/flexibleServers",
-              "apiVersion": "2024-08-01",
+              "apiVersion": "2025-08-01",
               "name": "[parameters('name')]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
@@ -437,7 +441,7 @@
             },
             "entraAdmin": {
               "type": "Microsoft.DBforPostgreSQL/flexibleServers/administrators",
-              "apiVersion": "2024-08-01",
+              "apiVersion": "2025-08-01",
               "name": "[format('{0}/{1}', parameters('name'), parameters('entraAdministrator').objectId)]",
               "properties": {
                 "principalType": "[parameters('entraAdministrator').principalType]",
@@ -454,7 +458,7 @@
                 "count": "[length(parameters('firewallRules'))]"
               },
               "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
-              "apiVersion": "2024-08-01",
+              "apiVersion": "2025-08-01",
               "name": "[format('{0}/{1}', parameters('name'), parameters('firewallRules')[copyIndex()].name)]",
               "properties": {
                 "startIpAddress": "[parameters('firewallRules')[copyIndex()].startIpAddress]",
@@ -470,7 +474,7 @@
                 "count": "[length(parameters('databases'))]"
               },
               "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
-              "apiVersion": "2024-08-01",
+              "apiVersion": "2025-08-01",
               "name": "[format('{0}/{1}', parameters('name'), parameters('databases')[copyIndex()].name)]",
               "properties": {
                 "charset": "[coalesce(tryGet(parameters('databases')[copyIndex()], 'charset'), 'UTF8')]",
@@ -483,7 +487,7 @@
             "pgvectorConfig": {
               "condition": "[parameters('enablePgvector')]",
               "type": "Microsoft.DBforPostgreSQL/flexibleServers/configurations",
-              "apiVersion": "2024-08-01",
+              "apiVersion": "2025-08-01",
               "name": "[format('{0}/{1}', parameters('name'), 'azure.extensions')]",
               "properties": {
                 "value": "VECTOR",
