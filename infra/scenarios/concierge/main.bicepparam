@@ -25,21 +25,48 @@ param disableLocalAuth = true
 // with the built-in default model list.
 //
 // Example: deploy a Japan East Foundry for gpt-4o + a US Foundry for gpt-5
-// param foundries = [
-//   {
-//     location: 'japaneast'
-//     models: [
-//       { name: 'gpt-4o', modelName: 'gpt-4o', modelFormat: 'OpenAI', skuName: 'GlobalStandard', skuCapacity: 50 }
-//       { name: 'text-embedding-3-large', modelName: 'text-embedding-3-large', modelFormat: 'OpenAI', skuName: 'Standard', skuCapacity: 50 }
-//     ]
-//   }
-//   {
-//     location: 'eastus2'
-//     models: [
-//       { name: 'gpt-5', modelName: 'gpt-5', modelVersion: '2025-08-07', modelFormat: 'OpenAI', skuName: 'GlobalStandard', skuCapacity: 50 }
-//     ]
-//   }
-// ]
+param foundries = [
+  {
+    location: 'japaneast'
+    models: [
+      {
+        name: 'gpt-5'
+        modelName: 'gpt-5'
+        modelVersion: '2025-08-07'
+        modelFormat: 'OpenAI'
+        skuName: 'GlobalStandard'
+        skuCapacity: 50
+      }
+      {
+        name: 'text-embedding-3-small'
+        modelName: 'text-embedding-3-small'
+        modelFormat: 'OpenAI'
+        skuName: 'Standard'
+        skuCapacity: 50
+      }
+      {
+        name: 'text-embedding-3-large'
+        modelName: 'text-embedding-3-large'
+        modelFormat: 'OpenAI'
+        skuName: 'Standard'
+        skuCapacity: 50
+      }
+    ]
+  }
+  {
+    location: 'eastus2'
+    models: [
+      {
+        name: 'gpt-5'
+        modelName: 'gpt-5'
+        modelVersion: '2025-08-07'
+        modelFormat: 'OpenAI'
+        skuName: 'GlobalStandard'
+        skuCapacity: 50
+      }
+    ]
+  }
+]
 
 // Optional: attach existing identities to receive Foundry inference role assignments.
 // Leaving these commented out (or setting them to []) skips role assignments for that category.
