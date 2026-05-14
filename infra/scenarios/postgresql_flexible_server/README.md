@@ -10,6 +10,42 @@ A Bicep scenario that provisions an Azure Database for PostgreSQL Flexible Serve
 
 By default this scenario provisions a managed environment equivalent to the [`pgvector/pgvector:pg18`](https://hub.docker.com/r/pgvector/pgvector) Docker image: PostgreSQL major version `18` with the `pgvector` extension allow-listed (`azure.extensions = VECTOR`) so it can be enabled with `CREATE EXTENSION vector;` against any database created on the server.
 
+## Deprecation Notice
+
+This scenario is **deprecated**. Use [`concierge`](../concierge/README.md) for new deployments.
+
+The `concierge` scenario supersedes this scenario by providing the same PostgreSQL resources alongside Azure AI Foundry and Application Insights tracing in one stack with independent feature flags (`enableApplicationInsights`, `enablePostgresql`).
+
+### Migration to `concierge`
+
+| `postgresql_flexible_server` | `concierge` | Notes |
+| --- | --- | --- |
+| `name` | `name` | Same meaning. |
+| `location` | `location` | Same meaning. |
+| `tags` | `tags` | Same meaning. |
+| `entraAdministrator` | `entraAdministrator` | Same meaning. |
+| `version` | `postgresVersion` | Renamed with `postgres` prefix. |
+| `skuName` | `postgresSkuName` | Renamed with `postgres` prefix. |
+| `skuTier` | `postgresSkuTier` | Renamed with `postgres` prefix. |
+| `storageSizeGB` | `postgresStorageSizeGB` | Renamed with `postgres` prefix. |
+| `enablePgvector` | `enablePgvector` | Same meaning. |
+| `firewallRules` | `firewallRules` | Same meaning. |
+| `databases` | `databases` | Same meaning. |
+| `enableObservability` | `enableApplicationInsights` | Renamed. When `true`, PostgreSQL diagnostics go to Log Analytics (and Foundry tracing resources are also available in the stack). |
+
+Output mapping:
+
+| `postgresql_flexible_server` output | `concierge` output | Notes |
+| --- | --- | --- |
+| `resourceGroupId` | `resourceGroupId` | Same meaning. |
+| `resourceGroupName` | `resourceGroupName` | Same meaning. |
+| `resourceGroupLocation` | `resourceGroupLocation` | Same meaning. |
+| `postgresServerId` | `postgresServerId` | Same meaning (`''` when `enablePostgresql = false`). |
+| `postgresServerName` | `postgresServerName` | Same meaning (`''` when `enablePostgresql = false`). |
+| `postgresServerFqdn` | `postgresServerFqdn` | Same meaning (`''` when `enablePostgresql = false`). |
+| `databaseNames` | `databaseNames` | Same meaning (`[]` when `enablePostgresql = false`). |
+| `logAnalyticsWorkspaceId` | `logAnalyticsWorkspaceId` | Same meaning when observability/application insights is enabled (`''` otherwise). |
+
 ## Overview
 
 This scenario targets the subscription scope and composes reusable modules:
