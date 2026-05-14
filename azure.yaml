@@ -5,6 +5,6 @@ metadata:
   template: template-bicep@0.0.1
 infra:
   provider: bicep
-  # FIXME: Rewrite the scenario name below to switch scenarios (e.g. resource_group).
-  path: infra/scenarios/resource_group
+  # FIXME: Rewrite the scenario name below to switch scenarios (e.g. hello_world).
+  path: infra/scenarios/concierge
   module: main
