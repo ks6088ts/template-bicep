@@ -40,7 +40,7 @@ type principalRolePair = {
 @maxLength(64)
 param name string
 
-@description('The location for the resource group and Azure resources')
+@description('The location for the resource group and Azure AI Foundry resources')
 param location string
 
 @description('Tags applied to all resources')
@@ -49,11 +49,20 @@ param tags object = {
   managedBy: 'bicep'
 }
 
-@description('Feature flag: when true, deploys Log Analytics + workspace-based Application Insights and configures Foundry tracing/diagnostic settings.')
-param enableApplicationInsights bool = true
+@description('Optional. Array of existing User Assigned Managed Identities (UAMI) to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no UAMI is attached.')
+param existingUserAssignedIdentities uamiReference[] = []
 
-@description('Feature flag: when true, deploys PostgreSQL Flexible Server (Entra ID-only) with optional pgvector and diagnostic settings.')
-param enablePostgresql bool = true
+@description('Optional. Array of object (principal) IDs of existing Microsoft Entra service principals to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no service principal is attached.')
+param existingServicePrincipalObjectIds string[] = []
+
+@description('Optional. Array of object IDs of existing Microsoft Entra users to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no user is attached.')
+param existingUserObjectIds string[] = []
+
+@description('Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication.')
+param disableLocalAuth bool = true
+
+@description('Enable Azure Monitor based observability resources (Log Analytics, Application Insights, diagnostic settings, and Foundry project tracing connection).')
+param enableObservability bool = false
 
 @description('The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs.')
 param models array = [
@@ -93,65 +102,6 @@ param roleDefinitionIds string[] = [
   '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 ]
 
-@description('Optional. Array of existing User Assigned Managed Identities (UAMI) to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no UAMI is attached.')
-param existingUserAssignedIdentities uamiReference[] = []
-
-@description('Optional. Array of object (principal) IDs of existing Microsoft Entra service principals to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no service principal is attached.')
-param existingServicePrincipalObjectIds string[] = []
-
-@description('Optional. Array of object IDs of existing Microsoft Entra users to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no user is attached.')
-param existingUserObjectIds string[] = []
-
-@description('Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication.')
-param disableLocalAuth bool = true
-
-@description('Microsoft Entra ID administrator for the PostgreSQL Flexible Server. When omitted, the principal executing the deployment (returned by deployer()) is registered as the administrator so the scenario can be deployed without any manual edits.')
-param entraAdministrator {
-  @description('The object ID (principal ID) of the Entra principal')
-  objectId: string
-
-  @description('The display name or UPN of the Entra principal')
-  principalName: string
-
-  @description('The type of the Entra principal')
-  principalType: ('User' | 'Group' | 'ServicePrincipal')
-
-  @description('The tenant ID for the Entra administrator')
-  tenantId: string
-}?
-
-@description('PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image.')
-param postgresVersion string = '18'
-
-@description('The compute SKU name for the flexible server')
-param postgresSkuName string = 'Standard_B1ms'
-
-@description('The SKU tier for the flexible server')
-@allowed(['Burstable', 'GeneralPurpose', 'MemoryOptimized'])
-param postgresSkuTier string = 'Burstable'
-
-@description('Storage size in GB for the flexible server')
-param postgresStorageSizeGB int = 32
-
-@description('When true, enables the pgvector extension by setting azure.extensions configuration to VECTOR')
-param enablePgvector bool = true
-
-@description('Firewall rules to create on the flexible server. Defaults to an "Allow Azure services" rule (0.0.0.0/0.0.0.0).')
-param firewallRules array = [
-  {
-    name: 'AllowAllAzureServices'
-    startIpAddress: '0.0.0.0'
-    endIpAddress: '0.0.0.0'
-  }
-]
-
-@description('Databases to create on the flexible server. Defaults to a single "appdb" database for validation.')
-param databases array = [
-  {
-    name: 'appdb'
-  }
-]
-
 // ------------------
 //    VARIABLES
 // ------------------
@@ -159,11 +109,9 @@ param databases array = [
 var resourceGroupName = 'rg-${name}'
 var foundryAccountName = take(toLower(replace('aif-${name}', '_', '-')), 59)
 var foundryProjectName = take('proj-${name}', 64)
-var postgresServerName = take(toLower(replace('psql-${name}', '_', '-')), 63)
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var applicationInsightsName = take(toLower(replace('appi-${name}', '_', '-')), 260)
 var foundryDiagnosticSettingsName = take('diag-${foundryAccountName}', 64)
-var postgresDiagnosticSettingsName = take('diag-${postgresServerName}', 256)
 var foundryAppInsightsConnectionName = take('appinsights-${foundryProjectName}', 64)
 
 // Cross-product each identity array with `roleDefinitionIds` into a flat list of struct pairs.
@@ -195,19 +143,6 @@ var userRolePairs principalRolePair[] = flatten(map(
       roleDefinitionGuid: roleDefinitionGuid
     })
 ))
-
-// Resolve the effective Microsoft Entra administrator for PostgreSQL.
-// When the caller does not pass `entraAdministrator`, fall back to the principal
-// executing the deployment (the `deployer()` function), so the scenario can be
-// deployed with no manual parameter edits.
-var deployerInfo = deployer()
-var deployerUserPrincipalName = deployerInfo.?userPrincipalName ?? ''
-var effectiveEntraAdministrator = entraAdministrator ?? {
-  objectId: deployerInfo.objectId
-  principalName: empty(deployerUserPrincipalName) ? deployerInfo.objectId : deployerUserPrincipalName
-  principalType: empty(deployerUserPrincipalName) ? 'ServicePrincipal' : 'User'
-  tenantId: deployerInfo.tenantId
-}
 
 // ------------------
 //    EXISTING RESOURCES
@@ -260,7 +195,7 @@ module foundryProject '../../modules/microsoft_foundry_project/main.bicep' = {
   dependsOn: [foundryAccount]
 }
 
-module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' = if (enableApplicationInsights) {
+module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' = if (enableObservability) {
   name: take('${name}-law-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
@@ -272,7 +207,7 @@ module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' 
   dependsOn: [resourceGroup]
 }
 
-module applicationInsights '../../modules/application_insights/main.bicep' = if (enableApplicationInsights) {
+module applicationInsights '../../modules/application_insights/main.bicep' = if (enableObservability) {
   name: take('${name}-appi-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
@@ -284,7 +219,7 @@ module applicationInsights '../../modules/application_insights/main.bicep' = if 
   }
 }
 
-module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' = if (enableApplicationInsights) {
+module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' = if (enableObservability) {
   name: take('${name}-diag-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
@@ -298,7 +233,7 @@ module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' 
   ]
 }
 
-module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/main.bicep' = if (enableApplicationInsights) {
+module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/main.bicep' = if (enableObservability) {
   name: take('${name}-appinsights-connection-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
@@ -387,38 +322,6 @@ module userRoleAssignments '../../modules/role_assignment/main.bicep' = [
   }
 ]
 
-module postgresServer '../../modules/postgresql_flexible_server/main.bicep' = if (enablePostgresql) {
-  name: take('${name}-psql-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    #disable-next-line BCP334
-    name: postgresServerName
-    location: location
-    tags: tags
-    version: postgresVersion
-    skuName: postgresSkuName
-    skuTier: postgresSkuTier
-    storageSizeGB: postgresStorageSizeGB
-    entraAdministrator: effectiveEntraAdministrator
-    firewallRules: firewallRules
-    databases: databases
-    enablePgvector: enablePgvector
-  }
-  dependsOn: [resourceGroup]
-}
-
-module postgresDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' = if (enablePostgresql && enableApplicationInsights) {
-  name: take('${name}-psql-diag-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    name: postgresDiagnosticSettingsName
-    workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
-    #disable-next-line BCP334
-    targetServerName: postgresServerName
-  }
-  dependsOn: [postgresServer]
-}
-
 // ------------------
 //    OUTPUTS
 // ------------------
@@ -450,26 +353,14 @@ output foundryProjectName string = foundryProject.outputs.name
 @description('The names of model deployments requested by this scenario')
 output deployedModelNames array = [for model in models: model.name]
 
-@description('The resource ID of the created Log Analytics workspace (empty when Application Insights is disabled)')
+@description('The resource ID of the created Log Analytics workspace (empty when observability is disabled)')
 output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.?outputs.id ?? ''
 
-@description('The resource ID of the created Application Insights component (empty when Application Insights is disabled)')
+@description('The resource ID of the created Application Insights component (empty when observability is disabled)')
 output applicationInsightsId string = applicationInsights.?outputs.id ?? ''
 
-@description('The connection string of the created Application Insights component (empty when Application Insights is disabled)')
+@description('The connection string of the created Application Insights component (empty when observability is disabled)')
 output applicationInsightsConnectionString string = applicationInsights.?outputs.connectionString ?? ''
-
-@description('The resource ID of the created PostgreSQL Flexible Server (empty when PostgreSQL is disabled)')
-output postgresServerId string = postgresServer.?outputs.id ?? ''
-
-@description('The name of the created PostgreSQL Flexible Server (empty when PostgreSQL is disabled)')
-output postgresServerName string = postgresServer.?outputs.name ?? ''
-
-@description('The fully qualified domain name (FQDN) of the created PostgreSQL Flexible Server (empty when PostgreSQL is disabled)')
-output postgresServerFqdn string = postgresServer.?outputs.fullyQualifiedDomainName ?? ''
-
-@description('The names of databases created on the flexible server (empty when PostgreSQL is disabled)')
-output databaseNames array = postgresServer.?outputs.databaseNames ?? []
 
 @description('The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)')
 output uamiRoleAssignmentIds string[] = [for (pair, i) in uamiRolePairs: uamiRoleAssignments[i].outputs.id]

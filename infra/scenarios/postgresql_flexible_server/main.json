@@ -1,0 +1,846 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.43.8.12551",
+      "templateHash": "5703160322773700439"
+    }
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "metadata": {
+        "description": "The name of the scenario, used to derive resource names"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "The location for the resource group and PostgreSQL Flexible Server resources"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "scenario": "[parameters('name')]",
+        "managedBy": "bicep"
+      },
+      "metadata": {
+        "description": "Tags applied to all resources"
+      }
+    },
+    "entraAdministrator": {
+      "type": "object",
+      "properties": {
+        "objectId": {
+          "type": "string",
+          "metadata": {
+            "description": "The object ID (principal ID) of the Entra principal"
+          }
+        },
+        "principalName": {
+          "type": "string",
+          "metadata": {
+            "description": "The display name or UPN of the Entra principal"
+          }
+        },
+        "principalType": {
+          "type": "string",
+          "allowedValues": [
+            "Group",
+            "ServicePrincipal",
+            "User"
+          ],
+          "metadata": {
+            "description": "The type of the Entra principal"
+          }
+        },
+        "tenantId": {
+          "type": "string",
+          "metadata": {
+            "description": "The tenant ID for the Entra administrator"
+          }
+        }
+      },
+      "nullable": true,
+      "metadata": {
+        "description": "Microsoft Entra ID administrator for the PostgreSQL Flexible Server. When omitted, the principal executing the deployment (returned by deployer()) is registered as the administrator so the scenario can be deployed without any manual edits."
+      }
+    },
+    "version": {
+      "type": "string",
+      "defaultValue": "18",
+      "metadata": {
+        "description": "PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image."
+      }
+    },
+    "skuName": {
+      "type": "string",
+      "defaultValue": "Standard_B1ms",
+      "metadata": {
+        "description": "The compute SKU name for the flexible server"
+      }
+    },
+    "skuTier": {
+      "type": "string",
+      "defaultValue": "Burstable",
+      "allowedValues": [
+        "Burstable",
+        "GeneralPurpose",
+        "MemoryOptimized"
+      ],
+      "metadata": {
+        "description": "The SKU tier for the flexible server"
+      }
+    },
+    "storageSizeGB": {
+      "type": "int",
+      "defaultValue": 32,
+      "metadata": {
+        "description": "Storage size in GB for the flexible server"
+      }
+    },
+    "enablePgvector": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "When true, enables the pgvector extension by setting azure.extensions configuration to VECTOR"
+      }
+    },
+    "firewallRules": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "AllowAllAzureServices",
+          "startIpAddress": "0.0.0.0",
+          "endIpAddress": "0.0.0.0"
+        }
+      ],
+      "metadata": {
+        "description": "Firewall rules to create on the flexible server. Defaults to an \"Allow Azure services\" rule (0.0.0.0/0.0.0.0)."
+      }
+    },
+    "databases": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "appdb"
+        }
+      ],
+      "metadata": {
+        "description": "Databases to create on the flexible server. Defaults to a single \"appdb\" database for validation."
+      }
+    },
+    "enableObservability": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable Azure Monitor based observability resources (Log Analytics workspace and diagnostic settings)."
+      }
+    }
+  },
+  "variables": {
+    "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
+    "postgresServerName": "[take(toLower(replace(format('psql-{0}', parameters('name')), '_', '-')), 63)]",
+    "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
+    "postgresDiagnosticSettingsName": "[take(format('diag-{0}', variables('postgresServerName')), 256)]",
+    "deployerInfo": "[deployer()]",
+    "deployerUserPrincipalName": "[coalesce(tryGet(variables('deployerInfo'), 'userPrincipalName'), '')]",
+    "effectiveEntraAdministrator": "[coalesce(parameters('entraAdministrator'), createObject('objectId', variables('deployerInfo').objectId, 'principalName', if(empty(variables('deployerUserPrincipalName')), variables('deployerInfo').objectId, variables('deployerUserPrincipalName')), 'principalType', if(empty(variables('deployerUserPrincipalName')), 'ServicePrincipal', 'User'), 'tenantId', variables('deployerInfo').tenantId))]"
+  },
+  "resources": {
+    "resourceGroup": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-rg-deployment', parameters('name')), 64)]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('resourceGroupName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "13006231347032579543"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 90,
+              "metadata": {
+                "description": "The name of the resource group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the resource group will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the resource group"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2025-04-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the resource group"
+              },
+              "value": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the resource group"
+              },
+              "value": "[parameters('name')]"
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The location of the resource group"
+              },
+              "value": "[reference(subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name')), '2025-04-01', 'full').location]"
+            }
+          }
+        }
+      }
+    },
+    "postgresServer": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-psql-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('postgresServerName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "version": {
+            "value": "[parameters('version')]"
+          },
+          "skuName": {
+            "value": "[parameters('skuName')]"
+          },
+          "skuTier": {
+            "value": "[parameters('skuTier')]"
+          },
+          "storageSizeGB": {
+            "value": "[parameters('storageSizeGB')]"
+          },
+          "entraAdministrator": {
+            "value": "[variables('effectiveEntraAdministrator')]"
+          },
+          "firewallRules": {
+            "value": "[parameters('firewallRules')]"
+          },
+          "databases": {
+            "value": "[parameters('databases')]"
+          },
+          "enablePgvector": {
+            "value": "[parameters('enablePgvector')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "11018863908357162830"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 63,
+              "metadata": {
+                "description": "The name of the Azure Database for PostgreSQL Flexible Server"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the PostgreSQL Flexible Server will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the PostgreSQL Flexible Server"
+              }
+            },
+            "version": {
+              "type": "string",
+              "defaultValue": "18",
+              "metadata": {
+                "description": "PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image."
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "Standard_B1ms",
+              "metadata": {
+                "description": "The compute SKU name for the flexible server"
+              }
+            },
+            "skuTier": {
+              "type": "string",
+              "defaultValue": "Burstable",
+              "allowedValues": [
+                "Burstable",
+                "GeneralPurpose",
+                "MemoryOptimized"
+              ],
+              "metadata": {
+                "description": "The SKU tier for the flexible server"
+              }
+            },
+            "storageSizeGB": {
+              "type": "int",
+              "defaultValue": 32,
+              "metadata": {
+                "description": "Storage size in GB for the flexible server"
+              }
+            },
+            "entraAdministrator": {
+              "type": "object",
+              "properties": {
+                "objectId": {
+                  "type": "string",
+                  "metadata": {
+                    "description": "The object ID (principal ID) of the Entra principal"
+                  }
+                },
+                "principalName": {
+                  "type": "string",
+                  "metadata": {
+                    "description": "The display name or UPN of the Entra principal"
+                  }
+                },
+                "principalType": {
+                  "type": "string",
+                  "allowedValues": [
+                    "Group",
+                    "ServicePrincipal",
+                    "User"
+                  ],
+                  "metadata": {
+                    "description": "The type of the Entra principal"
+                  }
+                },
+                "tenantId": {
+                  "type": "string",
+                  "metadata": {
+                    "description": "The tenant ID for the Entra administrator"
+                  }
+                }
+              },
+              "metadata": {
+                "description": "Microsoft Entra ID administrator configuration"
+              }
+            },
+            "firewallRules": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Firewall rules to create on the flexible server. Each element: { name, startIpAddress, endIpAddress }"
+              }
+            },
+            "databases": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Databases to create on the flexible server. Each element: { name, charset?, collation? }"
+              }
+            },
+            "enablePgvector": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "When true, enables the pgvector extension by setting azure.extensions configuration to VECTOR"
+              }
+            }
+          },
+          "resources": {
+            "postgresServer": {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+              "apiVersion": "2025-08-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('skuName')]",
+                "tier": "[parameters('skuTier')]"
+              },
+              "properties": {
+                "version": "[parameters('version')]",
+                "authConfig": {
+                  "activeDirectoryAuth": "Enabled",
+                  "passwordAuth": "Disabled",
+                  "tenantId": "[parameters('entraAdministrator').tenantId]"
+                },
+                "storage": {
+                  "storageSizeGB": "[parameters('storageSizeGB')]"
+                },
+                "network": {
+                  "publicNetworkAccess": "Enabled"
+                }
+              }
+            },
+            "entraAdmin": {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/administrators",
+              "apiVersion": "2025-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('entraAdministrator').objectId)]",
+              "properties": {
+                "principalType": "[parameters('entraAdministrator').principalType]",
+                "principalName": "[parameters('entraAdministrator').principalName]",
+                "tenantId": "[parameters('entraAdministrator').tenantId]"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            },
+            "firewallRuleResources": {
+              "copy": {
+                "name": "firewallRuleResources",
+                "count": "[length(parameters('firewallRules'))]"
+              },
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+              "apiVersion": "2025-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('firewallRules')[copyIndex()].name)]",
+              "properties": {
+                "startIpAddress": "[parameters('firewallRules')[copyIndex()].startIpAddress]",
+                "endIpAddress": "[parameters('firewallRules')[copyIndex()].endIpAddress]"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            },
+            "databaseResources": {
+              "copy": {
+                "name": "databaseResources",
+                "count": "[length(parameters('databases'))]"
+              },
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+              "apiVersion": "2025-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('databases')[copyIndex()].name)]",
+              "properties": {
+                "charset": "[coalesce(tryGet(parameters('databases')[copyIndex()], 'charset'), 'UTF8')]",
+                "collation": "[coalesce(tryGet(parameters('databases')[copyIndex()], 'collation'), 'en_US.utf8')]"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            },
+            "pgvectorConfig": {
+              "condition": "[parameters('enablePgvector')]",
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/configurations",
+              "apiVersion": "2025-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'azure.extensions')]",
+              "properties": {
+                "value": "VECTOR",
+                "source": "user-override"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the PostgreSQL Flexible Server"
+              },
+              "value": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the PostgreSQL Flexible Server"
+              },
+              "value": "[parameters('name')]"
+            },
+            "fullyQualifiedDomainName": {
+              "type": "string",
+              "metadata": {
+                "description": "The fully qualified domain name (FQDN) of the PostgreSQL Flexible Server"
+              },
+              "value": "[reference('postgresServer').fullyQualifiedDomainName]"
+            },
+            "databaseNames": {
+              "type": "array",
+              "metadata": {
+                "description": "The names of databases created on the flexible server"
+              },
+              "copy": {
+                "count": "[length(parameters('databases'))]",
+                "input": "[parameters('databases')[copyIndex()].name]"
+              }
+            },
+            "firewallRuleIds": {
+              "type": "array",
+              "metadata": {
+                "description": "The resource IDs of firewall rules created on the flexible server"
+              },
+              "copy": {
+                "count": "[length(parameters('firewallRules'))]",
+                "input": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/firewallRules', parameters('name'), parameters('firewallRules')[copyIndex()].name)]"
+              }
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "logAnalyticsWorkspace": {
+      "condition": "[parameters('enableObservability')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-law-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('logAnalyticsWorkspaceName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "15282767757597819840"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 63,
+              "metadata": {
+                "description": "The name of the Log Analytics workspace"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Log Analytics workspace will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Log Analytics workspace"
+              }
+            },
+            "retentionInDays": {
+              "type": "int",
+              "defaultValue": 30,
+              "minValue": 30,
+              "maxValue": 730,
+              "metadata": {
+                "description": "The retention period (days) for workspace data"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": "[parameters('retentionInDays')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace"
+              },
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Log Analytics workspace"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "postgresDiagnosticSettings": {
+      "condition": "[parameters('enableObservability')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-psql-diag-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('postgresDiagnosticSettingsName')]"
+          },
+          "workspaceResourceId": {
+            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "targetServerName": {
+            "value": "[variables('postgresServerName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.43.8.12551",
+              "templateHash": "12549242387600695814"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "metadata": {
+                "description": "The name of the diagnostic settings resource"
+              }
+            },
+            "workspaceResourceId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace destination"
+              }
+            },
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to. Provide either this or targetServerName."
+              }
+            },
+            "targetServerName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The name of the existing Azure Database for PostgreSQL Flexible Server that diagnostic settings will be applied to. Provide either this or targetAccountName."
+              }
+            },
+            "logs": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "categoryGroup": "allLogs",
+                  "enabled": true
+                }
+              ],
+              "metadata": {
+                "description": "The diagnostic log settings to configure"
+              }
+            },
+            "metrics": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "category": "AllMetrics",
+                  "enabled": true
+                }
+              ],
+              "metadata": {
+                "description": "The diagnostic metric settings to configure"
+              }
+            }
+          },
+          "resources": [
+            {
+              "condition": "[not(empty(parameters('targetAccountName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[parameters('name')]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('targetServerName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder'))]",
+              "name": "[parameters('name')]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the diagnostic settings resource"
+              },
+              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), extensionResourceId(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), if(not(empty(parameters('targetAccountName'))), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the diagnostic settings resource"
+              },
+              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), parameters('name'), null()), if(not(empty(parameters('targetAccountName'))), parameters('name'), null())), parameters('name'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalyticsWorkspace",
+        "postgresServer"
+      ]
+    }
+  },
+  "outputs": {
+    "resourceGroupId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created resource group"
+      },
+      "value": "[reference('resourceGroup').outputs.id.value]"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created resource group"
+      },
+      "value": "[reference('resourceGroup').outputs.name.value]"
+    },
+    "resourceGroupLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "The location of the created resource group"
+      },
+      "value": "[reference('resourceGroup').outputs.location.value]"
+    },
+    "postgresServerId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created PostgreSQL Flexible Server"
+      },
+      "value": "[reference('postgresServer').outputs.id.value]"
+    },
+    "postgresServerName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created PostgreSQL Flexible Server"
+      },
+      "value": "[reference('postgresServer').outputs.name.value]"
+    },
+    "postgresServerFqdn": {
+      "type": "string",
+      "metadata": {
+        "description": "The fully qualified domain name (FQDN) of the created PostgreSQL Flexible Server"
+      },
+      "value": "[reference('postgresServer').outputs.fullyQualifiedDomainName.value]"
+    },
+    "databaseNames": {
+      "type": "array",
+      "metadata": {
+        "description": "The names of databases created on the flexible server"
+      },
+      "value": "[reference('postgresServer').outputs.databaseNames.value]"
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Log Analytics workspace (empty when observability is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+    }
+  }
+}
