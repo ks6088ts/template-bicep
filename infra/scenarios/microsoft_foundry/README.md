@@ -6,6 +6,12 @@ ms.date: 2026-05-11
 
 # Microsoft Foundry Scenario
 
+> **⚠️ DEPRECATION NOTICE**
+>
+> This scenario is deprecated and will be removed in a future release. Please migrate to the [**`concierge`**](../concierge/README.md) scenario, which consolidates this scenario with PostgreSQL Flexible Server support and provides a unified infrastructure deployment for the [ks6088ts-labs/concierge](https://github.com/ks6088ts-labs/concierge) application.
+>
+> See the [Migration to `concierge`](#migration-to-concierge) section below for parameter mapping.
+
 A Bicep scenario that provisions an Azure AI Foundry account (`Microsoft.CognitiveServices/accounts`), a Foundry project, model deployments, and (optionally) scope-limited role assignments for any number of existing User Assigned Managed Identities (UAMI), Microsoft Entra service principals, and Microsoft Entra users. It can also opt in Azure Monitor based observability (Log Analytics, Application Insights, diagnostic settings, and Foundry project tracing connection).
 
 ## Overview
@@ -150,3 +156,56 @@ Each optional identity array expects IDs whose actual Microsoft Entra type match
 | `existingServicePrincipalObjectIds` | `ServicePrincipal` (Enterprise Application object ID, not application/client ID) | `az ad sp show --id <application-id-or-name> --query id --output tsv` |
 | `existingUserObjectIds` | `User` | `az ad signed-in-user show --query id --output tsv` or `az ad user show --id <upn-or-objectid> --query id --output tsv` |
 | `existingUserAssignedIdentities` | `ServicePrincipal` (managed identity) | `az identity show --name <uami-name> --resource-group <rg-name>` |
+
+## Migration to `concierge`
+
+The [`concierge` scenario](../concierge/README.md) consolidates this scenario with [PostgreSQL Flexible Server](../postgresql_flexible_server/README.md) support, providing a unified infrastructure deployment for the [ks6088ts-labs/concierge](https://github.com/ks6088ts-labs/concierge) application stack.
+
+### Parameter Mapping
+
+| `microsoft_foundry` Parameter | `concierge` Parameter | Notes |
+| --- | --- | --- |
+| `name` | `name` | Unchanged |
+| `location` | `location` | Unchanged |
+| `tags` | `tags` | Unchanged |
+| `enableObservability` | `enableApplicationInsights` | Renamed for clarity; same behavior (Log Analytics + Application Insights + Foundry tracing) |
+| `models` | `models` | Unchanged |
+| `roleDefinitionIds` | `roleDefinitionIds` | Unchanged |
+| `existingUserAssignedIdentities` | `existingUserAssignedIdentities` | Unchanged |
+| `existingServicePrincipalObjectIds` | `existingServicePrincipalObjectIds` | Unchanged |
+| `existingUserObjectIds` | `existingUserObjectIds` | Unchanged |
+| `disableLocalAuth` | `disableLocalAuth` | Unchanged |
+
+### Migration Steps
+
+1. **Update parameter file**: Rename `enableObservability` to `enableApplicationInsights` in your parameter file.
+2. **Add PostgreSQL control** (optional): Set `enablePostgresql = false` in `main.bicepparam` if you don't need PostgreSQL (matches the behavior of this scenario).
+3. **Update deployment commands**: Replace `SCENARIO=microsoft_foundry` with `SCENARIO=concierge` in `make deploy` commands, or update `azure.yaml` to point to `infra/scenarios/concierge`.
+
+Example migration:
+
+```bash
+# Old deployment
+make deploy SCENARIO=microsoft_foundry
+
+# New deployment (Foundry only, no PostgreSQL)
+az deployment sub create \
+  --location japaneast \
+  --template-file infra/scenarios/concierge/main.bicep \
+  --parameters infra/scenarios/concierge/main.bicepparam \
+  --parameters enablePostgresql=false
+
+# Or with make
+make deploy SCENARIO=concierge
+# Then edit concierge/main.bicepparam to set enablePostgresql=false if you don't need it
+```
+
+### Benefits of Migrating to `concierge`
+
+- **Unified stack**: Single scenario for Foundry + observability + PostgreSQL pgvector, matching the [concierge application](https://github.com/ks6088ts-labs/concierge) architecture
+- **Feature flags**: Independent control of Application Insights (`enableApplicationInsights`) and PostgreSQL (`enablePostgresql`)
+- **Maintained**: The `concierge` scenario will receive updates and improvements; this scenario is frozen
+- **Same modules**: Uses identical underlying modules, so behavior is consistent
+
+For full documentation, see the [concierge scenario README](../concierge/README.md).
+

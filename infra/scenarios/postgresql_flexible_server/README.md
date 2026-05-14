@@ -6,6 +6,12 @@ ms.date: 2026-05-13
 
 # PostgreSQL Flexible Server Scenario
 
+> **⚠️ DEPRECATION NOTICE**
+>
+> This scenario is deprecated and will be removed in a future release. Please migrate to the [**`concierge`**](../concierge/README.md) scenario, which consolidates this scenario with Azure AI Foundry support and provides a unified infrastructure deployment for the [ks6088ts-labs/concierge](https://github.com/ks6088ts-labs/concierge) application.
+>
+> See the [Migration to `concierge`](#migration-to-concierge) section below for parameter mapping.
+
 A Bicep scenario that provisions an Azure Database for PostgreSQL Flexible Server (`Microsoft.DBforPostgreSQL/flexibleServers`) with Microsoft Entra ID-only authentication (password authentication disabled), an optional pgvector extension for vector similarity search, configurable firewall rules, initial databases, and optionally Azure Monitor-based observability (Log Analytics workspace and diagnostic settings).
 
 By default this scenario provisions a managed environment equivalent to the [`pgvector/pgvector:pg18`](https://hub.docker.com/r/pgvector/pgvector) Docker image: PostgreSQL major version `18` with the `pgvector` extension allow-listed (`azure.extensions = VECTOR`) so it can be enabled with `CREATE EXTENSION vector;` against any database created on the server.
@@ -167,3 +173,60 @@ The `postgresql_flexible_server` module handles all child resources inline:
 | `flexibleServers/firewallRules` | Creates 0-N firewall rules from the `firewallRules` array |
 | `flexibleServers/databases` | Creates 0-N databases from the `databases` array |
 | `flexibleServers/configurations` | Sets `azure.extensions = VECTOR` when `enablePgvector = true` |
+
+## Migration to `concierge`
+
+The [`concierge` scenario](../concierge/README.md) consolidates this scenario with [Azure AI Foundry](../microsoft_foundry/README.md) support, providing a unified infrastructure deployment for the [ks6088ts-labs/concierge](https://github.com/ks6088ts-labs/concierge) application stack.
+
+### Parameter Mapping
+
+| `postgresql_flexible_server` Parameter | `concierge` Parameter | Notes |
+| --- | --- | --- |
+| `name` | `name` | Unchanged |
+| `location` | `location` | Unchanged |
+| `tags` | `tags` | Unchanged |
+| `entraAdministrator` | `entraAdministrator` | Unchanged |
+| `version` | `postgresVersion` | Renamed to avoid collision with Foundry parameters |
+| `skuName` | `postgresSkuName` | Renamed to avoid collision |
+| `skuTier` | `postgresSkuTier` | Renamed to avoid collision |
+| `storageSizeGB` | `postgresStorageSizeGB` | Renamed to avoid collision |
+| `enablePgvector` | `enablePgvector` | Unchanged |
+| `firewallRules` | `firewallRules` | Unchanged |
+| `databases` | `databases` | Unchanged |
+| `enableObservability` | `enableApplicationInsights` | Renamed; same Log Analytics + diagnostic settings behavior |
+
+### Migration Steps
+
+1. **Update parameter file**: Rename PostgreSQL-specific parameters:
+   - `version` → `postgresVersion`
+   - `skuName` → `postgresSkuName`
+   - `skuTier` → `postgresSkuTier`
+   - `storageSizeGB` → `postgresStorageSizeGB`
+   - `enableObservability` → `enableApplicationInsights`
+
+2. **Add Foundry control** (optional): Set `enableApplicationInsights = false` in `main.bicepparam` if you don't need Application Insights observability (matches the behavior of this scenario with `enableObservability = false`).
+
+3. **Update deployment commands**: Replace `SCENARIO=postgresql_flexible_server` with `SCENARIO=concierge` in `make deploy` commands, or update `azure.yaml` to point to `infra/scenarios/concierge`.
+
+Example migration:
+
+```bash
+# Old deployment
+make deploy SCENARIO=postgresql_flexible_server
+
+# New deployment (PostgreSQL + Foundry full stack)
+make deploy SCENARIO=concierge
+
+# Or deploy PostgreSQL only without Foundry models (not recommended; use concierge for the full stack)
+# The concierge scenario always includes Foundry; to deploy PostgreSQL standalone, continue using this scenario
+```
+
+### Benefits of Migrating to `concierge`
+
+- **Unified stack**: Single scenario for Foundry + observability + PostgreSQL pgvector, matching the [concierge application](https://github.com/ks6088ts-labs/concierge) architecture
+- **Feature flags**: Independent control of Application Insights (`enableApplicationInsights`) and PostgreSQL (`enablePostgresql`)
+- **Maintained**: The `concierge` scenario will receive updates and improvements; this scenario is frozen
+- **Same modules**: Uses identical underlying modules, so PostgreSQL behavior is consistent
+
+For full documentation, see the [concierge scenario README](../concierge/README.md).
+
