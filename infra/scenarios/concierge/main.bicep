@@ -348,8 +348,8 @@ module uamiRoleAssignments '../../modules/role_assignment/main.bicep' = [
       principalId: uamis[pair.uamiIndex].properties.principalId
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
       roleAssignmentNameSeed: guid(
-        foundryAccount.outputs.id
-        uamis[pair.uamiIndex].properties.principalId
+        foundryAccount.outputs.id,
+        uamis[pair.uamiIndex].properties.principalId,
         pair.roleDefinitionGuid
       )
       principalType: 'ServicePrincipal'
@@ -481,4 +481,3 @@ output servicePrincipalRoleAssignmentIds string[] = [
 
 @description('The resource IDs of role assignments granted to every existing user (empty when no user is attached)')
 output userRoleAssignmentIds string[] = [for (pair, i) in userRolePairs: userRoleAssignments[i].outputs.id]
-

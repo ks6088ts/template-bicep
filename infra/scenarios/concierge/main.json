@@ -1,0 +1,2306 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.42.1.51946",
+      "templateHash": "6007405803832302173"
+    }
+  },
+  "definitions": {
+    "uamiReference": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "metadata": {
+            "description": "The name of the existing User Assigned Managed Identity."
+          }
+        },
+        "resourceGroup": {
+          "type": "string",
+          "metadata": {
+            "description": "The resource group name where the existing UAMI lives."
+          }
+        }
+      },
+      "metadata": {
+        "description": "Reference to an existing User Assigned Managed Identity (UAMI)."
+      }
+    },
+    "uamiRolePair": {
+      "type": "object",
+      "properties": {
+        "uamiIndex": {
+          "type": "int",
+          "metadata": {
+            "description": "Index of the UAMI in `existingUserAssignedIdentities` whose principalId receives the role."
+          }
+        },
+        "roleDefinitionGuid": {
+          "type": "string",
+          "metadata": {
+            "description": "Role definition GUID to grant at Foundry account scope."
+          }
+        }
+      },
+      "metadata": {
+        "description": "A (UAMI, role definition) pair generated for each role assignment iteration."
+      }
+    },
+    "principalRolePair": {
+      "type": "object",
+      "properties": {
+        "principalId": {
+          "type": "string",
+          "metadata": {
+            "description": "The Microsoft Entra principal (object) ID that receives the role."
+          }
+        },
+        "roleDefinitionGuid": {
+          "type": "string",
+          "metadata": {
+            "description": "Role definition GUID to grant at Foundry account scope."
+          }
+        }
+      },
+      "metadata": {
+        "description": "A (principal object ID, role definition) pair generated for each service principal/user role assignment iteration."
+      }
+    }
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "metadata": {
+        "description": "The name of the scenario, used to derive resource names"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "The location for the resource group and Azure resources"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "scenario": "[parameters('name')]",
+        "managedBy": "bicep"
+      },
+      "metadata": {
+        "description": "Tags applied to all resources"
+      }
+    },
+    "enableApplicationInsights": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Feature flag: when true, deploys Log Analytics + workspace-based Application Insights and configures Foundry tracing/diagnostic settings."
+      }
+    },
+    "enablePostgresql": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Feature flag: when true, deploys PostgreSQL Flexible Server (Entra ID-only) with optional pgvector and diagnostic settings."
+      }
+    },
+    "models": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "gpt-4o",
+          "modelName": "gpt-4o",
+          "modelFormat": "OpenAI",
+          "skuName": "GlobalStandard",
+          "skuCapacity": 50
+        },
+        {
+          "name": "gpt-5",
+          "modelName": "gpt-5",
+          "modelVersion": "2025-08-07",
+          "modelFormat": "OpenAI",
+          "skuName": "GlobalStandard",
+          "skuCapacity": 50
+        },
+        {
+          "name": "text-embedding-3-large",
+          "modelName": "text-embedding-3-large",
+          "modelFormat": "OpenAI",
+          "skuName": "Standard",
+          "skuCapacity": 50
+        },
+        {
+          "name": "text-embedding-3-small",
+          "modelName": "text-embedding-3-small",
+          "modelFormat": "OpenAI",
+          "skuName": "Standard",
+          "skuCapacity": 50
+        }
+      ],
+      "metadata": {
+        "description": "The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs."
+      }
+    },
+    "roleDefinitionIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [
+        "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+      ],
+      "metadata": {
+        "description": "Role definition GUIDs assigned to every existing UAMI, service principal, and user at Azure AI Foundry account scope."
+      }
+    },
+    "existingUserAssignedIdentities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/uamiReference"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional. Array of existing User Assigned Managed Identities (UAMI) to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no UAMI is attached."
+      }
+    },
+    "existingServicePrincipalObjectIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional. Array of object (principal) IDs of existing Microsoft Entra service principals to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no service principal is attached."
+      }
+    },
+    "existingUserObjectIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional. Array of object IDs of existing Microsoft Entra users to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no user is attached."
+      }
+    },
+    "disableLocalAuth": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication."
+      }
+    },
+    "entraAdministrator": {
+      "type": "object",
+      "properties": {
+        "objectId": {
+          "type": "string",
+          "metadata": {
+            "description": "The object ID (principal ID) of the Entra principal"
+          }
+        },
+        "principalName": {
+          "type": "string",
+          "metadata": {
+            "description": "The display name or UPN of the Entra principal"
+          }
+        },
+        "principalType": {
+          "type": "string",
+          "allowedValues": [
+            "Group",
+            "ServicePrincipal",
+            "User"
+          ],
+          "metadata": {
+            "description": "The type of the Entra principal"
+          }
+        },
+        "tenantId": {
+          "type": "string",
+          "metadata": {
+            "description": "The tenant ID for the Entra administrator"
+          }
+        }
+      },
+      "nullable": true,
+      "metadata": {
+        "description": "Microsoft Entra ID administrator for the PostgreSQL Flexible Server. When omitted, the principal executing the deployment (returned by deployer()) is registered as the administrator so the scenario can be deployed without any manual edits."
+      }
+    },
+    "postgresVersion": {
+      "type": "string",
+      "defaultValue": "18",
+      "metadata": {
+        "description": "PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image."
+      }
+    },
+    "postgresSkuName": {
+      "type": "string",
+      "defaultValue": "Standard_B1ms",
+      "metadata": {
+        "description": "The compute SKU name for the flexible server"
+      }
+    },
+    "postgresSkuTier": {
+      "type": "string",
+      "defaultValue": "Burstable",
+      "allowedValues": [
+        "Burstable",
+        "GeneralPurpose",
+        "MemoryOptimized"
+      ],
+      "metadata": {
+        "description": "The SKU tier for the flexible server"
+      }
+    },
+    "postgresStorageSizeGB": {
+      "type": "int",
+      "defaultValue": 32,
+      "metadata": {
+        "description": "Storage size in GB for the flexible server"
+      }
+    },
+    "enablePgvector": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "When true, enables the pgvector extension by setting azure.extensions configuration to VECTOR"
+      }
+    },
+    "firewallRules": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "AllowAllAzureServices",
+          "startIpAddress": "0.0.0.0",
+          "endIpAddress": "0.0.0.0"
+        }
+      ],
+      "metadata": {
+        "description": "Firewall rules to create on the flexible server. Defaults to an \"Allow Azure services\" rule (0.0.0.0/0.0.0.0)."
+      }
+    },
+    "databases": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "appdb"
+        }
+      ],
+      "metadata": {
+        "description": "Databases to create on the flexible server. Defaults to a single \"appdb\" database for validation."
+      }
+    }
+  },
+  "variables": {
+    "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
+    "foundryAccountName": "[take(toLower(replace(format('aif-{0}', parameters('name')), '_', '-')), 59)]",
+    "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]",
+    "postgresServerName": "[take(toLower(replace(format('psql-{0}', parameters('name')), '_', '-')), 63)]",
+    "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
+    "applicationInsightsName": "[take(toLower(replace(format('appi-{0}', parameters('name')), '_', '-')), 260)]",
+    "foundryDiagnosticSettingsName": "[take(format('diag-{0}', variables('foundryAccountName')), 64)]",
+    "postgresDiagnosticSettingsName": "[take(format('diag-{0}', variables('postgresServerName')), 256)]",
+    "foundryAppInsightsConnectionName": "[take(format('appinsights-{0}', variables('foundryProjectName')), 64)]",
+    "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
+    "servicePrincipalRolePairs": "[flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
+    "userRolePairs": "[flatten(map(parameters('existingUserObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
+    "deployerInfo": "[deployer()]",
+    "deployerUserPrincipalName": "[coalesce(tryGet(variables('deployerInfo'), 'userPrincipalName'), '')]",
+    "effectiveEntraAdministrator": "[coalesce(parameters('entraAdministrator'), createObject('objectId', variables('deployerInfo').objectId, 'principalName', if(empty(variables('deployerUserPrincipalName')), variables('deployerInfo').objectId, variables('deployerUserPrincipalName')), 'principalType', if(empty(variables('deployerUserPrincipalName')), 'ServicePrincipal', 'User'), 'tenantId', variables('deployerInfo').tenantId))]"
+  },
+  "resources": {
+    "uamis": {
+      "copy": {
+        "name": "uamis",
+        "count": "[length(parameters('existingUserAssignedIdentities'))]"
+      },
+      "existing": true,
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2024-11-30",
+      "resourceGroup": "[parameters('existingUserAssignedIdentities')[copyIndex()].resourceGroup]",
+      "name": "[parameters('existingUserAssignedIdentities')[copyIndex()].name]"
+    },
+    "resourceGroup": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-rg-deployment', parameters('name')), 64)]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('resourceGroupName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "10375022168103187164"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 90,
+              "metadata": {
+                "description": "The name of the resource group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the resource group will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the resource group"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2025-04-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the resource group"
+              },
+              "value": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the resource group"
+              },
+              "value": "[parameters('name')]"
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The location of the resource group"
+              },
+              "value": "[reference(subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name')), '2025-04-01', 'full').location]"
+            }
+          }
+        }
+      }
+    },
+    "foundryAccount": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-foundry-account-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "disableLocalAuth": {
+            "value": "[parameters('disableLocalAuth')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "15661186683057703240"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the Azure AI Foundry account"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Azure AI Foundry account will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Azure AI Foundry account"
+              }
+            },
+            "customSubDomainName": {
+              "type": "string",
+              "defaultValue": "[parameters('name')]",
+              "minLength": 2,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The custom subdomain name for the Azure AI Foundry account endpoint"
+              }
+            },
+            "publicNetworkAccess": {
+              "type": "string",
+              "defaultValue": "Enabled",
+              "allowedValues": [
+                "Enabled",
+                "Disabled"
+              ],
+              "metadata": {
+                "description": "Controls public network access to the Azure AI Foundry account"
+              }
+            },
+            "disableLocalAuth": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Disable local authentication (API keys) and require Entra ID authentication"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2026-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "kind": "AIServices",
+              "sku": {
+                "name": "S0"
+              },
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "customSubDomainName": "[parameters('customSubDomainName')]",
+                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
+                "disableLocalAuth": "[parameters('disableLocalAuth')]",
+                "allowProjectManagement": true
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Azure AI Foundry account"
+              },
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Azure AI Foundry account"
+              },
+              "value": "[parameters('name')]"
+            },
+            "endpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "The endpoint of the Azure AI Foundry account"
+              },
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2026-03-01').endpoint]"
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "The principal ID of the Azure AI Foundry account System Assigned Managed Identity"
+              },
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2026-03-01', 'full').identity.principalId]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "foundryProject": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-foundry-project-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "parentAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "name": {
+            "value": "[variables('foundryProjectName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "displayName": {
+            "value": "[variables('foundryProjectName')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "10198835172886096054"
+            }
+          },
+          "parameters": {
+            "parentAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the parent Azure AI Foundry account"
+              }
+            },
+            "name": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The name of the Azure AI Foundry project"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Azure AI Foundry project will be created"
+              }
+            },
+            "displayName": {
+              "type": "string",
+              "defaultValue": "[parameters('name')]",
+              "minLength": 2,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The display name of the Azure AI Foundry project"
+              }
+            },
+            "projectDescription": {
+              "type": "string",
+              "defaultValue": "",
+              "maxLength": 1024,
+              "metadata": {
+                "description": "The description of the Azure AI Foundry project"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Azure AI Foundry project"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts/projects",
+              "apiVersion": "2025-12-01",
+              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": "[shallowMerge(createArray(createObject('displayName', parameters('displayName')), if(empty(parameters('projectDescription')), createObject(), createObject('description', parameters('projectDescription')))))]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Azure AI Foundry project"
+              },
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('parentAccountName'), parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Azure AI Foundry project"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "foundryAccount"
+      ]
+    },
+    "logAnalyticsWorkspace": {
+      "condition": "[parameters('enableApplicationInsights')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-law-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('logAnalyticsWorkspaceName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "9009423525462246214"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 63,
+              "metadata": {
+                "description": "The name of the Log Analytics workspace"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Log Analytics workspace will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Log Analytics workspace"
+              }
+            },
+            "retentionInDays": {
+              "type": "int",
+              "defaultValue": 30,
+              "minValue": 30,
+              "maxValue": 730,
+              "metadata": {
+                "description": "The retention period (days) for workspace data"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": "[parameters('retentionInDays')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace"
+              },
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Log Analytics workspace"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "applicationInsights": {
+      "condition": "[parameters('enableApplicationInsights')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-appi-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('applicationInsightsName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "workspaceResourceId": {
+            "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "5780734512434141150"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 260,
+              "metadata": {
+                "description": "The name of the Application Insights component"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Application Insights component will be created"
+              }
+            },
+            "workspaceResourceId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace used for workspace-based ingestion"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Application Insights component"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/components",
+              "apiVersion": "2020-02-02",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "kind": "web",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "Application_Type": "web",
+                "WorkspaceResourceId": "[parameters('workspaceResourceId')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Application Insights component"
+              },
+              "value": "[resourceId('Microsoft.Insights/components', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Application Insights component"
+              },
+              "value": "[parameters('name')]"
+            },
+            "connectionString": {
+              "type": "string",
+              "metadata": {
+                "description": "The connection string of the Application Insights component"
+              },
+              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('name')), '2020-02-02').ConnectionString]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalyticsWorkspace"
+      ]
+    },
+    "foundryDiagnosticSettings": {
+      "condition": "[parameters('enableApplicationInsights')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-diag-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('foundryDiagnosticSettingsName')]"
+          },
+          "workspaceResourceId": {
+            "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "targetAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "5247795374404343839"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "metadata": {
+                "description": "The name of the diagnostic settings resource"
+              }
+            },
+            "workspaceResourceId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace destination"
+              }
+            },
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to. Provide either this or targetServerName."
+              }
+            },
+            "targetServerName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The name of the existing Azure Database for PostgreSQL Flexible Server that diagnostic settings will be applied to. Provide either this or targetAccountName."
+              }
+            },
+            "logs": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "categoryGroup": "allLogs",
+                  "enabled": true
+                }
+              ],
+              "metadata": {
+                "description": "The diagnostic log settings to configure"
+              }
+            },
+            "metrics": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "category": "AllMetrics",
+                  "enabled": true
+                }
+              ],
+              "metadata": {
+                "description": "The diagnostic metric settings to configure"
+              }
+            }
+          },
+          "resources": [
+            {
+              "condition": "[not(empty(parameters('targetAccountName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[parameters('name')]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('targetServerName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder'))]",
+              "name": "[parameters('name')]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the diagnostic settings resource"
+              },
+              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), extensionResourceId(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), if(not(empty(parameters('targetAccountName'))), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the diagnostic settings resource"
+              },
+              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), parameters('name'), null()), if(not(empty(parameters('targetAccountName'))), parameters('name'), null())), parameters('name'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "foundryAccount",
+        "logAnalyticsWorkspace"
+      ]
+    },
+    "foundryAppInsightsConnection": {
+      "condition": "[parameters('enableApplicationInsights')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-appinsights-connection-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "parentAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "name": {
+            "value": "[variables('foundryAppInsightsConnectionName')]"
+          },
+          "parentProjectName": {
+            "value": "[variables('foundryProjectName')]"
+          },
+          "category": {
+            "value": "AppInsights"
+          },
+          "target": {
+            "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "credentialKey": {
+            "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('applicationInsights'), null()), 'outputs', 'connectionString', 'value'), '')]"
+          },
+          "resourceId": {
+            "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "isSharedToAll": {
+            "value": false
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "11421745627715216901"
+            }
+          },
+          "parameters": {
+            "parentAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the parent Azure AI Foundry account"
+              }
+            },
+            "parentProjectName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The name of the parent Azure AI Foundry project"
+              }
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The name of the connection resource"
+              }
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The connection category for the Foundry project"
+              }
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The target endpoint or resource ID for the connection"
+              }
+            },
+            "credentialKey": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional credential key used for ApiKey-based connections"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region of the connected resource"
+              }
+            },
+            "resourceId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The Azure resource ID of the connected resource"
+              }
+            },
+            "isSharedToAll": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Whether the connection is shared to all resources in the project"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts/projects/connections",
+              "apiVersion": "2025-12-01",
+              "name": "[format('{0}/{1}/{2}', parameters('parentAccountName'), parameters('parentProjectName'), parameters('name'))]",
+              "properties": "[shallowMerge(createArray(createObject('authType', 'ApiKey', 'category', parameters('category'), 'target', parameters('target')), if(empty(parameters('credentialKey')), createObject(), createObject('credentials', createObject('key', parameters('credentialKey')))), createObject('isSharedToAll', parameters('isSharedToAll'), 'metadata', createObject('ApiType', 'Azure', 'ResourceId', parameters('resourceId'), 'location', parameters('location')))))]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Foundry project connection"
+              },
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects/connections', parameters('parentAccountName'), parameters('parentProjectName'), parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Foundry project connection"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "applicationInsights",
+        "foundryProject"
+      ]
+    },
+    "modelDeployments": {
+      "copy": {
+        "name": "modelDeployments",
+        "count": "[length(parameters('models'))]",
+        "mode": "serial",
+        "batchSize": 1
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-model-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "parentAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "name": {
+            "value": "[parameters('models')[copyIndex()].name]"
+          },
+          "modelName": {
+            "value": "[parameters('models')[copyIndex()].modelName]"
+          },
+          "modelVersion": {
+            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelVersion'), ''))]"
+          },
+          "modelFormat": {
+            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelFormat'), 'OpenAI'))]"
+          },
+          "skuName": {
+            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'skuName'), 'GlobalStandard'))]"
+          },
+          "skuCapacity": {
+            "value": "[int(coalesce(tryGet(parameters('models')[copyIndex()], 'skuCapacity'), 50))]"
+          },
+          "raiPolicyName": {
+            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'raiPolicyName'), ''))]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "5808504932132325214"
+            }
+          },
+          "parameters": {
+            "parentAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the parent Azure AI Foundry account"
+              }
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The name of the model deployment"
+              }
+            },
+            "modelName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "metadata": {
+                "description": "The model name to deploy"
+              }
+            },
+            "modelVersion": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The model version to deploy (optional)"
+              }
+            },
+            "modelFormat": {
+              "type": "string",
+              "defaultValue": "OpenAI",
+              "minLength": 1,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The model format to deploy"
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "GlobalStandard",
+              "minLength": 1,
+              "maxLength": 64,
+              "metadata": {
+                "description": "The SKU name for the model deployment"
+              }
+            },
+            "skuCapacity": {
+              "type": "int",
+              "defaultValue": 50,
+              "minValue": 1,
+              "metadata": {
+                "description": "The SKU capacity for the model deployment"
+              }
+            },
+            "raiPolicyName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The Responsible AI policy name (optional)"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2026-03-01",
+              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
+              "sku": {
+                "name": "[parameters('skuName')]",
+                "capacity": "[parameters('skuCapacity')]"
+              },
+              "properties": "[shallowMerge(createArray(createObject('model', shallowMerge(createArray(createObject('format', parameters('modelFormat'), 'name', parameters('modelName')), if(empty(parameters('modelVersion')), createObject(), createObject('version', parameters('modelVersion')))))), if(empty(parameters('raiPolicyName')), createObject(), createObject('raiPolicyName', parameters('raiPolicyName')))))]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the model deployment"
+              },
+              "value": "[resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the model deployment"
+              },
+              "value": "[parameters('name')]"
+            },
+            "provisioningState": {
+              "type": "string",
+              "metadata": {
+                "description": "The provisioning state of the model deployment"
+              },
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name')), '2026-03-01').provisioningState]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "foundryProject"
+      ]
+    },
+    "uamiRoleAssignments": {
+      "copy": {
+        "name": "uamiRoleAssignments",
+        "count": "[length(variables('uamiRolePairs'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-uami-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "principalId": {
+            "value": "[reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference('foundryAccount').outputs.id.value, reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "17805555448297308216"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry account resource"
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(parameters('targetAccountName'), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[variables('roleAssignmentName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "foundryAccount",
+        "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]",
+        "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]"
+      ]
+    },
+    "servicePrincipalRoleAssignments": {
+      "copy": {
+        "name": "servicePrincipalRoleAssignments",
+        "count": "[length(variables('servicePrincipalRolePairs'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-sp-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "principalId": {
+            "value": "[variables('servicePrincipalRolePairs')[copyIndex()].principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference('foundryAccount').outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "17805555448297308216"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry account resource"
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(parameters('targetAccountName'), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[variables('roleAssignmentName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "foundryAccount"
+      ]
+    },
+    "userRoleAssignments": {
+      "copy": {
+        "name": "userRoleAssignments",
+        "count": "[length(variables('userRolePairs'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-user-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetAccountName": {
+            "value": "[variables('foundryAccountName')]"
+          },
+          "principalId": {
+            "value": "[variables('userRolePairs')[copyIndex()].principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference('foundryAccount').outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "principalType": {
+            "value": "User"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "17805555448297308216"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry account resource"
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(parameters('targetAccountName'), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetAccountName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[variables('roleAssignmentName')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "foundryAccount"
+      ]
+    },
+    "postgresServer": {
+      "condition": "[parameters('enablePostgresql')]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-psql-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('postgresServerName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "version": {
+            "value": "[parameters('postgresVersion')]"
+          },
+          "skuName": {
+            "value": "[parameters('postgresSkuName')]"
+          },
+          "skuTier": {
+            "value": "[parameters('postgresSkuTier')]"
+          },
+          "storageSizeGB": {
+            "value": "[parameters('postgresStorageSizeGB')]"
+          },
+          "entraAdministrator": {
+            "value": "[variables('effectiveEntraAdministrator')]"
+          },
+          "firewallRules": {
+            "value": "[parameters('firewallRules')]"
+          },
+          "databases": {
+            "value": "[parameters('databases')]"
+          },
+          "enablePgvector": {
+            "value": "[parameters('enablePgvector')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "12362911082645376857"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 63,
+              "metadata": {
+                "description": "The name of the Azure Database for PostgreSQL Flexible Server"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the PostgreSQL Flexible Server will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the PostgreSQL Flexible Server"
+              }
+            },
+            "version": {
+              "type": "string",
+              "defaultValue": "18",
+              "metadata": {
+                "description": "PostgreSQL major version. Defaults to 18 to match the pgvector/pgvector:pg18 reference image."
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "Standard_B1ms",
+              "metadata": {
+                "description": "The compute SKU name for the flexible server"
+              }
+            },
+            "skuTier": {
+              "type": "string",
+              "defaultValue": "Burstable",
+              "allowedValues": [
+                "Burstable",
+                "GeneralPurpose",
+                "MemoryOptimized"
+              ],
+              "metadata": {
+                "description": "The SKU tier for the flexible server"
+              }
+            },
+            "storageSizeGB": {
+              "type": "int",
+              "defaultValue": 32,
+              "metadata": {
+                "description": "Storage size in GB for the flexible server"
+              }
+            },
+            "entraAdministrator": {
+              "type": "object",
+              "properties": {
+                "objectId": {
+                  "type": "string",
+                  "metadata": {
+                    "description": "The object ID (principal ID) of the Entra principal"
+                  }
+                },
+                "principalName": {
+                  "type": "string",
+                  "metadata": {
+                    "description": "The display name or UPN of the Entra principal"
+                  }
+                },
+                "principalType": {
+                  "type": "string",
+                  "allowedValues": [
+                    "Group",
+                    "ServicePrincipal",
+                    "User"
+                  ],
+                  "metadata": {
+                    "description": "The type of the Entra principal"
+                  }
+                },
+                "tenantId": {
+                  "type": "string",
+                  "metadata": {
+                    "description": "The tenant ID for the Entra administrator"
+                  }
+                }
+              },
+              "metadata": {
+                "description": "Microsoft Entra ID administrator configuration"
+              }
+            },
+            "firewallRules": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Firewall rules to create on the flexible server. Each element: { name, startIpAddress, endIpAddress }"
+              }
+            },
+            "databases": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Databases to create on the flexible server. Each element: { name, charset?, collation? }"
+              }
+            },
+            "enablePgvector": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "When true, enables the pgvector extension by setting azure.extensions configuration to VECTOR"
+              }
+            }
+          },
+          "resources": {
+            "postgresServer": {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+              "apiVersion": "2025-08-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('skuName')]",
+                "tier": "[parameters('skuTier')]"
+              },
+              "properties": {
+                "version": "[parameters('version')]",
+                "authConfig": {
+                  "activeDirectoryAuth": "Enabled",
+                  "passwordAuth": "Disabled",
+                  "tenantId": "[parameters('entraAdministrator').tenantId]"
+                },
+                "storage": {
+                  "storageSizeGB": "[parameters('storageSizeGB')]"
+                },
+                "network": {
+                  "publicNetworkAccess": "Enabled"
+                }
+              }
+            },
+            "entraAdmin": {
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/administrators",
+              "apiVersion": "2025-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('entraAdministrator').objectId)]",
+              "properties": {
+                "principalType": "[parameters('entraAdministrator').principalType]",
+                "principalName": "[parameters('entraAdministrator').principalName]",
+                "tenantId": "[parameters('entraAdministrator').tenantId]"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            },
+            "firewallRuleResources": {
+              "copy": {
+                "name": "firewallRuleResources",
+                "count": "[length(parameters('firewallRules'))]"
+              },
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/firewallRules",
+              "apiVersion": "2025-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('firewallRules')[copyIndex()].name)]",
+              "properties": {
+                "startIpAddress": "[parameters('firewallRules')[copyIndex()].startIpAddress]",
+                "endIpAddress": "[parameters('firewallRules')[copyIndex()].endIpAddress]"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            },
+            "databaseResources": {
+              "copy": {
+                "name": "databaseResources",
+                "count": "[length(parameters('databases'))]"
+              },
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/databases",
+              "apiVersion": "2025-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), parameters('databases')[copyIndex()].name)]",
+              "properties": {
+                "charset": "[coalesce(tryGet(parameters('databases')[copyIndex()], 'charset'), 'UTF8')]",
+                "collation": "[coalesce(tryGet(parameters('databases')[copyIndex()], 'collation'), 'en_US.utf8')]"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            },
+            "pgvectorConfig": {
+              "condition": "[parameters('enablePgvector')]",
+              "type": "Microsoft.DBforPostgreSQL/flexibleServers/configurations",
+              "apiVersion": "2025-08-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'azure.extensions')]",
+              "properties": {
+                "value": "VECTOR",
+                "source": "user-override"
+              },
+              "dependsOn": [
+                "postgresServer"
+              ]
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the PostgreSQL Flexible Server"
+              },
+              "value": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the PostgreSQL Flexible Server"
+              },
+              "value": "[parameters('name')]"
+            },
+            "fullyQualifiedDomainName": {
+              "type": "string",
+              "metadata": {
+                "description": "The fully qualified domain name (FQDN) of the PostgreSQL Flexible Server"
+              },
+              "value": "[reference('postgresServer').fullyQualifiedDomainName]"
+            },
+            "databaseNames": {
+              "type": "array",
+              "metadata": {
+                "description": "The names of databases created on the flexible server"
+              },
+              "copy": {
+                "count": "[length(parameters('databases'))]",
+                "input": "[parameters('databases')[copyIndex()].name]"
+              }
+            },
+            "firewallRuleIds": {
+              "type": "array",
+              "metadata": {
+                "description": "The resource IDs of firewall rules created on the flexible server"
+              },
+              "copy": {
+                "count": "[length(parameters('firewallRules'))]",
+                "input": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers/firewallRules', parameters('name'), parameters('firewallRules')[copyIndex()].name)]"
+              }
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "postgresDiagnosticSettings": {
+      "condition": "[and(parameters('enablePostgresql'), parameters('enableApplicationInsights'))]",
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-psql-diag-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('postgresDiagnosticSettingsName')]"
+          },
+          "workspaceResourceId": {
+            "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+          },
+          "targetServerName": {
+            "value": "[variables('postgresServerName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "5247795374404343839"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "metadata": {
+                "description": "The name of the diagnostic settings resource"
+              }
+            },
+            "workspaceResourceId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace destination"
+              }
+            },
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to. Provide either this or targetServerName."
+              }
+            },
+            "targetServerName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The name of the existing Azure Database for PostgreSQL Flexible Server that diagnostic settings will be applied to. Provide either this or targetAccountName."
+              }
+            },
+            "logs": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "categoryGroup": "allLogs",
+                  "enabled": true
+                }
+              ],
+              "metadata": {
+                "description": "The diagnostic log settings to configure"
+              }
+            },
+            "metrics": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "category": "AllMetrics",
+                  "enabled": true
+                }
+              ],
+              "metadata": {
+                "description": "The diagnostic metric settings to configure"
+              }
+            }
+          },
+          "resources": [
+            {
+              "condition": "[not(empty(parameters('targetAccountName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[parameters('name')]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            },
+            {
+              "condition": "[not(empty(parameters('targetServerName')))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder'))]",
+              "name": "[parameters('name')]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the diagnostic settings resource"
+              },
+              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), extensionResourceId(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), if(not(empty(parameters('targetAccountName'))), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the diagnostic settings resource"
+              },
+              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), parameters('name'), null()), if(not(empty(parameters('targetAccountName'))), parameters('name'), null())), parameters('name'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalyticsWorkspace",
+        "postgresServer"
+      ]
+    }
+  },
+  "outputs": {
+    "resourceGroupId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created resource group"
+      },
+      "value": "[reference('resourceGroup').outputs.id.value]"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created resource group"
+      },
+      "value": "[reference('resourceGroup').outputs.name.value]"
+    },
+    "resourceGroupLocation": {
+      "type": "string",
+      "metadata": {
+        "description": "The location of the created resource group"
+      },
+      "value": "[reference('resourceGroup').outputs.location.value]"
+    },
+    "foundryAccountId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Azure AI Foundry account"
+      },
+      "value": "[reference('foundryAccount').outputs.id.value]"
+    },
+    "foundryAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created Azure AI Foundry account"
+      },
+      "value": "[reference('foundryAccount').outputs.name.value]"
+    },
+    "foundryEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "The endpoint of the created Azure AI Foundry account"
+      },
+      "value": "[reference('foundryAccount').outputs.endpoint.value]"
+    },
+    "foundryProjectId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Azure AI Foundry project"
+      },
+      "value": "[reference('foundryProject').outputs.id.value]"
+    },
+    "foundryProjectName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created Azure AI Foundry project"
+      },
+      "value": "[reference('foundryProject').outputs.name.value]"
+    },
+    "deployedModelNames": {
+      "type": "array",
+      "metadata": {
+        "description": "The names of model deployments requested by this scenario"
+      },
+      "copy": {
+        "count": "[length(parameters('models'))]",
+        "input": "[parameters('models')[copyIndex()].name]"
+      }
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Log Analytics workspace (empty when Application Insights is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+    },
+    "applicationInsightsId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Application Insights component (empty when Application Insights is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
+    },
+    "applicationInsightsConnectionString": {
+      "type": "string",
+      "metadata": {
+        "description": "The connection string of the created Application Insights component (empty when Application Insights is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('applicationInsights'), null()), 'outputs', 'connectionString', 'value'), '')]"
+    },
+    "postgresServerId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created PostgreSQL Flexible Server (empty when PostgreSQL is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enablePostgresql'), reference('postgresServer'), null()), 'outputs', 'id', 'value'), '')]"
+    },
+    "postgresServerName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created PostgreSQL Flexible Server (empty when PostgreSQL is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enablePostgresql'), reference('postgresServer'), null()), 'outputs', 'name', 'value'), '')]"
+    },
+    "postgresServerFqdn": {
+      "type": "string",
+      "metadata": {
+        "description": "The fully qualified domain name (FQDN) of the created PostgreSQL Flexible Server (empty when PostgreSQL is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enablePostgresql'), reference('postgresServer'), null()), 'outputs', 'fullyQualifiedDomainName', 'value'), '')]"
+    },
+    "databaseNames": {
+      "type": "array",
+      "metadata": {
+        "description": "The names of databases created on the flexible server (empty when PostgreSQL is disabled)"
+      },
+      "value": "[coalesce(tryGet(if(parameters('enablePostgresql'), reference('postgresServer'), null()), 'outputs', 'databaseNames', 'value'), createArray())]"
+    },
+    "uamiRoleAssignmentIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "metadata": {
+        "description": "The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)"
+      },
+      "copy": {
+        "count": "[length(variables('uamiRolePairs'))]",
+        "input": "[reference(format('uamiRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+      }
+    },
+    "servicePrincipalRoleAssignmentIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "metadata": {
+        "description": "The resource IDs of role assignments granted to every existing service principal (empty when no service principal is attached)"
+      },
+      "copy": {
+        "count": "[length(variables('servicePrincipalRolePairs'))]",
+        "input": "[reference(format('servicePrincipalRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+      }
+    },
+    "userRoleAssignmentIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "metadata": {
+        "description": "The resource IDs of role assignments granted to every existing user (empty when no user is attached)"
+      },
+      "copy": {
+        "count": "[length(variables('userRolePairs'))]",
+        "input": "[reference(format('userRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+      }
+    }
+  }
+}
