@@ -74,7 +74,7 @@ output resourceGroupLocation string = resourceGroup.outputs.location
 
 @description('Array of created User Assigned Managed Identities (same order as the `userAssignedIdentities` input parameter).')
 output userAssignedIdentities array = [
-  for i in range(0, length(userAssignedIdentities)): {
+  for (identity, i) in userAssignedIdentities: {
     id: uami[i].outputs.id
     name: uami[i].outputs.name
     principalId: uami[i].outputs.principalId
