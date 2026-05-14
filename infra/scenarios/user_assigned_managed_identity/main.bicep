@@ -9,7 +9,7 @@ targetScope = 'subscription'
 @maxLength(64)
 param name string
 
-@description('The location for the resource group and User Assigned Managed Identity')
+@description('The location for the resource group and User Assigned Managed Identities')
 param location string
 
 @description('Tags applied to all resources')
@@ -18,12 +18,20 @@ param tags object = {
   managedBy: 'bicep'
 }
 
+@description('A single User Assigned Managed Identity (UAMI) to create in the shared resource group.')
+type userAssignedIdentitySpec = {
+  @description('The full name of the User Assigned Managed Identity (must satisfy the underlying module name constraints: 3-128 chars).')
+  name: string
+}
+
+@description('Array of User Assigned Managed Identities to create in the shared resource group `rg-{name}`. Names must be unique within the array.')
+param userAssignedIdentities userAssignedIdentitySpec[]
+
 // ------------------
 //    VARIABLES
 // ------------------
 
 var resourceGroupName = 'rg-${name}'
-var userAssignedIdentityName = 'id-${name}'
 
 // ------------------
 //    RESOURCES
@@ -38,16 +46,18 @@ module resourceGroup '../../modules/resource_group/main.bicep' = {
   }
 }
 
-module userAssignedManagedIdentity '../../modules/user_assigned_managed_identity/main.bicep' = {
-  name: take('${name}-uami-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    name: userAssignedIdentityName
-    location: location
-    tags: tags
+module uami '../../modules/user_assigned_managed_identity/main.bicep' = [
+  for (identity, i) in userAssignedIdentities: {
+    name: take('${name}-uami-${i}-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      name: identity.name
+      location: location
+      tags: tags
+    }
+    dependsOn: [resourceGroup]
   }
-  dependsOn: [resourceGroup]
-}
+]
 
 // ------------------
 //    OUTPUTS
@@ -62,17 +72,13 @@ output resourceGroupName string = resourceGroup.outputs.name
 @description('The location of the created resource group')
 output resourceGroupLocation string = resourceGroup.outputs.location
 
-@description('The resource ID of the created User Assigned Managed Identity')
-output userAssignedIdentityId string = userAssignedManagedIdentity.outputs.id
-
-@description('The name of the created User Assigned Managed Identity')
-output userAssignedIdentityName string = userAssignedManagedIdentity.outputs.name
-
-@description('The principal ID of the created User Assigned Managed Identity')
-output userAssignedIdentityPrincipalId string = userAssignedManagedIdentity.outputs.principalId
-
-@description('The client ID of the created User Assigned Managed Identity')
-output userAssignedIdentityClientId string = userAssignedManagedIdentity.outputs.clientId
-
-@description('The tenant ID of the created User Assigned Managed Identity')
-output userAssignedIdentityTenantId string = userAssignedManagedIdentity.outputs.tenantId
+@description('Array of created User Assigned Managed Identities (same order as the `userAssignedIdentities` input parameter).')
+output userAssignedIdentities array = [
+  for i in range(0, length(userAssignedIdentities)): {
+    id: uami[i].outputs.id
+    name: uami[i].outputs.name
+    principalId: uami[i].outputs.principalId
+    clientId: uami[i].outputs.clientId
+    tenantId: uami[i].outputs.tenantId
+  }
+]

@@ -1,11 +1,28 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
   "contentVersion": "1.0.0.0",
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.43.8.12551",
-      "templateHash": "2211824166221374758"
+      "version": "0.42.1.51946",
+      "templateHash": "11139600222552175042"
+    }
+  },
+  "definitions": {
+    "userAssignedIdentitySpec": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "metadata": {
+            "description": "The full name of the User Assigned Managed Identity (must satisfy the underlying module name constraints: 3-128 chars)."
+          }
+        }
+      },
+      "metadata": {
+        "description": "A single User Assigned Managed Identity (UAMI) to create in the shared resource group."
+      }
     }
   },
   "parameters": {
@@ -20,7 +37,7 @@
     "location": {
       "type": "string",
       "metadata": {
-        "description": "The location for the resource group and User Assigned Managed Identity"
+        "description": "The location for the resource group and User Assigned Managed Identities"
       }
     },
     "tags": {
@@ -32,14 +49,22 @@
       "metadata": {
         "description": "Tags applied to all resources"
       }
+    },
+    "userAssignedIdentities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/userAssignedIdentitySpec"
+      },
+      "metadata": {
+        "description": "Array of User Assigned Managed Identities to create in the shared resource group `rg-{name}`. Names must be unique within the array."
+      }
     }
   },
   "variables": {
-    "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
-    "userAssignedIdentityName": "[format('id-{0}', parameters('name'))]"
+    "resourceGroupName": "[format('rg-{0}', parameters('name'))]"
   },
-  "resources": [
-    {
+  "resources": {
+    "resourceGroup": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "[take(format('{0}-rg-deployment', parameters('name')), 64)]",
@@ -66,8 +91,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "13006231347032579543"
+              "version": "0.42.1.51946",
+              "templateHash": "10375022168103187164"
             }
           },
           "parameters": {
@@ -128,10 +153,14 @@
         }
       }
     },
-    {
+    "uami": {
+      "copy": {
+        "name": "uami",
+        "count": "[length(parameters('userAssignedIdentities'))]"
+      },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-uami-deployment', parameters('name')), 64)]",
+      "name": "[take(format('{0}-uami-{1}-deployment', parameters('name'), copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -140,7 +169,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('userAssignedIdentityName')]"
+            "value": "[parameters('userAssignedIdentities')[copyIndex()].name]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -155,8 +184,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "2934015800894633207"
+              "version": "0.42.1.51946",
+              "templateHash": "18350230912836153091"
             }
           },
           "parameters": {
@@ -231,66 +260,47 @@
         }
       },
       "dependsOn": [
-        "[subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64))]"
+        "resourceGroup"
       ]
     }
-  ],
+  },
   "outputs": {
     "resourceGroupId": {
       "type": "string",
       "metadata": {
         "description": "The resource ID of the created resource group"
       },
-      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.id.value]"
+      "value": "[reference('resourceGroup').outputs.id.value]"
     },
     "resourceGroupName": {
       "type": "string",
       "metadata": {
         "description": "The name of the created resource group"
       },
-      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.name.value]"
+      "value": "[reference('resourceGroup').outputs.name.value]"
     },
     "resourceGroupLocation": {
       "type": "string",
       "metadata": {
         "description": "The location of the created resource group"
       },
-      "value": "[reference(subscriptionResourceId('Microsoft.Resources/deployments', take(format('{0}-rg-deployment', parameters('name')), 64)), '2025-04-01').outputs.location.value]"
+      "value": "[reference('resourceGroup').outputs.location.value]"
     },
-    "userAssignedIdentityId": {
-      "type": "string",
+    "userAssignedIdentities": {
+      "type": "array",
       "metadata": {
-        "description": "The resource ID of the created User Assigned Managed Identity"
+        "description": "Array of created User Assigned Managed Identities (same order as the `userAssignedIdentities` input parameter)."
       },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.id.value]"
-    },
-    "userAssignedIdentityName": {
-      "type": "string",
-      "metadata": {
-        "description": "The name of the created User Assigned Managed Identity"
-      },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.name.value]"
-    },
-    "userAssignedIdentityPrincipalId": {
-      "type": "string",
-      "metadata": {
-        "description": "The principal ID of the created User Assigned Managed Identity"
-      },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.principalId.value]"
-    },
-    "userAssignedIdentityClientId": {
-      "type": "string",
-      "metadata": {
-        "description": "The client ID of the created User Assigned Managed Identity"
-      },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.clientId.value]"
-    },
-    "userAssignedIdentityTenantId": {
-      "type": "string",
-      "metadata": {
-        "description": "The tenant ID of the created User Assigned Managed Identity"
-      },
-      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.Resources/deployments', take(format('{0}-uami-deployment', parameters('name')), 64)), '2025-04-01').outputs.tenantId.value]"
+      "copy": {
+        "count": "[length(range(0, length(parameters('userAssignedIdentities'))))]",
+        "input": {
+          "id": "[reference(format('uami[{0}]', range(0, length(parameters('userAssignedIdentities')))[copyIndex()])).outputs.id.value]",
+          "name": "[reference(format('uami[{0}]', range(0, length(parameters('userAssignedIdentities')))[copyIndex()])).outputs.name.value]",
+          "principalId": "[reference(format('uami[{0}]', range(0, length(parameters('userAssignedIdentities')))[copyIndex()])).outputs.principalId.value]",
+          "clientId": "[reference(format('uami[{0}]', range(0, length(parameters('userAssignedIdentities')))[copyIndex()])).outputs.clientId.value]",
+          "tenantId": "[reference(format('uami[{0}]', range(0, length(parameters('userAssignedIdentities')))[copyIndex()])).outputs.tenantId.value]"
+        }
+      }
     }
   }
 }
