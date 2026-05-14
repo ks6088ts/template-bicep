@@ -4,7 +4,38 @@ using 'main.bicep'
 // account names containing the trademarked word "microsoft" (ReservedResourceName). Underscores are
 // also invalid in Foundry project names, so we use a hyphenated, non-reserved value here.
 param name = 'templatebicepfoundry'
-param location = 'japaneast'
+param foundryDeployments = [
+  {
+    location: 'japaneast'
+    models: [
+      {
+        name: 'gpt-4o'
+        modelName: 'gpt-4o'
+        skuCapacity: 50
+      }
+      {
+        name: 'text-embedding-3-large'
+        modelName: 'text-embedding-3-large'
+        skuName: 'Standard'
+      }
+      {
+        name: 'text-embedding-3-small'
+        modelName: 'text-embedding-3-small'
+        skuName: 'Standard'
+      }
+    ]
+  }
+  {
+    location: 'eastus2'
+    models: [
+      {
+        name: 'gpt-5'
+        modelName: 'gpt-5'
+        modelVersion: '2025-08-07'
+      }
+    ]
+  }
+]
 param tags = {
   environment: 'dev'
   owner: 'ks6088ts'
@@ -14,7 +45,6 @@ param tags = {
 
 // Enable API key based authentication on the Foundry account. Set to true to require Entra ID only.
 param disableLocalAuth = false
-
 
 // Optional: enable observability resources (Log Analytics, Application Insights, diagnostic settings,
 // and Foundry project tracing connection). Leave commented out (or set to false) to preserve the
@@ -46,5 +76,4 @@ param enableObservability = true
 //   '00000000-0000-0000-0000-000000000000'
 // ]
 
-// models / roleDefinitionIds use defaults from main.bicep.
-// Adjust models (for example skuCapacity or modelName) to match target region availability and quota.
+// roleDefinitionIds uses default from main.bicep.
