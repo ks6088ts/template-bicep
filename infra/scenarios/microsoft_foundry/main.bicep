@@ -222,6 +222,7 @@ module foundryAccounts '../../modules/microsoft_foundry/main.bicep' = [
     name: take('${name}-foundry-account-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
+      #disable-next-line BCP334
       name: foundryDeploymentsResolved[i].accountName
       location: deployment.location
       tags: tags
@@ -236,6 +237,7 @@ module foundryProjects '../../modules/microsoft_foundry_project/main.bicep' = [
     name: take('${name}-foundry-project-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
+      #disable-next-line BCP334
       parentAccountName: foundryDeploymentsResolved[i].accountName
       name: foundryDeploymentsResolved[i].projectName
       location: deployment.location
@@ -250,6 +252,7 @@ module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' 
   name: take('${name}-law-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
+    #disable-next-line BCP334
     name: logAnalyticsWorkspaceName
     location: resourceGroupLocation
     tags: tags
@@ -261,6 +264,7 @@ module applicationInsights '../../modules/application_insights/main.bicep' = if 
   name: take('${name}-appi-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
+    #disable-next-line BCP334
     name: applicationInsightsName
     location: resourceGroupLocation
     workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
@@ -288,6 +292,7 @@ module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/
     name: take('${name}-appinsights-connection-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
+      #disable-next-line BCP334
       parentAccountName: foundryDeploymentsResolved[i].accountName
       name: take('appinsights-${foundryDeploymentsResolved[i].projectName}', 64)
       parentProjectName: foundryDeploymentsResolved[i].projectName
@@ -310,6 +315,7 @@ module modelDeployments '../../modules/microsoft_foundry_model_deployment/main.b
     name: take('${name}-model-${pair.accountIndex}-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
+      #disable-next-line BCP334
       parentAccountName: foundryDeploymentsResolved[pair.accountIndex].accountName
       name: pair.model.name
       modelName: pair.model.modelName
@@ -328,6 +334,7 @@ module uamiRoleAssignments '../../modules/role_assignment/main.bicep' = [
     name: take('${name}-uami-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
+      #disable-next-line BCP334
       targetAccountName: foundryDeploymentsResolved[pair.accountIndex].accountName
       principalId: uamis[pair.uamiIndex].properties.principalId
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
@@ -346,6 +353,7 @@ module servicePrincipalRoleAssignments '../../modules/role_assignment/main.bicep
     name: take('${name}-sp-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
+      #disable-next-line BCP334
       targetAccountName: foundryDeploymentsResolved[pair.accountIndex].accountName
       principalId: pair.principalId
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
@@ -364,6 +372,7 @@ module userRoleAssignments '../../modules/role_assignment/main.bicep' = [
     name: take('${name}-user-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
+      #disable-next-line BCP334
       targetAccountName: foundryDeploymentsResolved[pair.accountIndex].accountName
       principalId: pair.principalId
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)

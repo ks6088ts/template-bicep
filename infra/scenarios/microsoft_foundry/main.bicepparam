@@ -9,9 +9,9 @@ param foundryDeployments = [
     location: 'japaneast'
     models: [
       {
-        name: 'gpt-4o'
-        modelName: 'gpt-4o'
-        skuCapacity: 50
+        name: 'gpt-5'
+        modelName: 'gpt-5'
+        modelVersion: '2025-08-07'
       }
       {
         name: 'text-embedding-3-large'
@@ -32,6 +32,16 @@ param foundryDeployments = [
         name: 'gpt-5'
         modelName: 'gpt-5'
         modelVersion: '2025-08-07'
+      }
+      {
+        name: 'text-embedding-3-large'
+        modelName: 'text-embedding-3-large'
+        skuName: 'Standard'
+      }
+      {
+        name: 'text-embedding-3-small'
+        modelName: 'text-embedding-3-small'
+        skuName: 'Standard'
       }
     ]
   }
