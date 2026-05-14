@@ -10,9 +10,6 @@ A GitHub template repository for Bicep
 | --- | --- | --- |
 | [hello_world](./infra/scenarios/hello_world/README.md) | A simple "Hello, World!" example using Bicep. | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fks6088ts%2Ftemplate-bicep%2Frefs%2Fheads%2Fmain%2Finfra%2Fscenarios%2Fhello_world%2Fmain.json) |
 | [concierge](./infra/scenarios/concierge/README.md) | Provision the concierge full stack (Azure AI Foundry + Application Insights tracing + PostgreSQL Flexible Server pgvector) with independent feature flags. | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fks6088ts%2Ftemplate-bicep%2Frefs%2Fheads%2Fmain%2Finfra%2Fscenarios%2Fconcierge%2Fmain.json) |
-| [microsoft_foundry](./infra/scenarios/microsoft_foundry/README.md) | Provision an Azure AI Foundry account, project, model deployments, and inference role assignments for existing identities. *(deprecated → concierge)* | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fks6088ts%2Ftemplate-bicep%2Frefs%2Fheads%2Fmain%2Finfra%2Fscenarios%2Fmicrosoft_foundry%2Fmain.json) |
-| [resource_group](./infra/scenarios/resource_group/README.md) | Provision a single resource group via a reusable module. | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fks6088ts%2Ftemplate-bicep%2Frefs%2Fheads%2Fmain%2Finfra%2Fscenarios%2Fresource_group%2Fmain.json) |
-| [postgresql_flexible_server](./infra/scenarios/postgresql_flexible_server/README.md) | Provision an Azure Database for PostgreSQL Flexible Server with Entra ID-only authentication, optional pgvector extension, and optional Azure Monitor observability. *(deprecated → concierge)* | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fks6088ts%2Ftemplate-bicep%2Frefs%2Fheads%2Fmain%2Finfra%2Fscenarios%2Fpostgresql_flexible_server%2Fmain.json) |
 | [user_assigned_managed_identity](./infra/scenarios/user_assigned_managed_identity/README.md) | Provision a User Assigned Managed Identity inside a dedicated resource group using reusable modules. | [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fks6088ts%2Ftemplate-bicep%2Frefs%2Fheads%2Fmain%2Finfra%2Fscenarios%2Fuser_assigned_managed_identity%2Fmain.json) |
 
 ## Deploy with Azure Developer CLI (azd)
@@ -24,7 +21,7 @@ The repository ships with an [`azure.yaml`](./azure.yaml) so the whole repo can 
 azd env new concierge
 
 # 2. (Optional) Edit infra.path in azure.yaml to point to a different scenario,
-#    e.g. infra/scenarios/resource_group
+#    e.g. infra/scenarios/hello_world
 
 # 3. Provision Azure resources
 azd up
