@@ -6,7 +6,7 @@ ms.date: 2026-05-14
 
 # Concierge Scenario
 
-A Bicep scenario that provisions the infrastructure used by [`ks6088ts-labs/concierge`](https://github.com/ks6088ts-labs/concierge): Azure AI Foundry (account + project + model deployments), optional Azure Monitor / Application Insights based observability (Log Analytics + workspace-based Application Insights + Foundry tracing/diagnostics), and optional Azure Database for PostgreSQL Flexible Server (Entra ID-only authentication + optional pgvector + firewall rules + initial databases).
+A Bicep scenario that provisions the infrastructure used by [`ks6088ts-labs/concierge`](https://github.com/ks6088ts-labs/concierge): Azure AI Foundry (one or more account + project + model deployment sets), optional Azure Monitor / Application Insights based observability (Log Analytics + workspace-based Application Insights + Foundry tracing/diagnostics), and optional Azure Database for PostgreSQL Flexible Server (Entra ID-only authentication + optional pgvector + firewall rules + initial databases).
 
 This scenario composes the existing `microsoft_foundry` and `postgresql_flexible_server` building blocks into a single deployable stack:
 
@@ -19,9 +19,9 @@ make deploy SCENARIO=concierge
 This scenario targets the subscription scope and composes reusable modules:
 
 1. [`resource_group` module](../../modules/resource_group/main.bicep) — creates the resource group.
-2. [`microsoft_foundry` module](../../modules/microsoft_foundry/main.bicep) — creates the Azure AI Foundry account.
-3. [`microsoft_foundry_project` module](../../modules/microsoft_foundry_project/main.bicep) — creates the Foundry project under the account.
-4. [`microsoft_foundry_model_deployment` module](../../modules/microsoft_foundry_model_deployment/main.bicep) — creates model deployments under the account (sequential with `@batchSize(1)`).
+2. [`microsoft_foundry` module](../../modules/microsoft_foundry/main.bicep) — creates one Azure AI Foundry account per `foundries` entry.
+3. [`microsoft_foundry_project` module](../../modules/microsoft_foundry_project/main.bicep) — creates one Foundry project under each account.
+4. [`microsoft_foundry_model_deployment` module](../../modules/microsoft_foundry_model_deployment/main.bicep) — creates model deployments under each account (sequential with `@batchSize(1)` across the flattened account×model list).
 5. [`role_assignment` module](../../modules/role_assignment/main.bicep) — grants Foundry inference permissions to any combination of existing UAMIs, service principals, and users at account scope (all opt-in via array parameters).
 6. [`log_analytics_workspace` module](../../modules/log_analytics_workspace/main.bicep) — creates a Log Analytics workspace when `enableApplicationInsights = true`.
 7. [`application_insights` module](../../modules/application_insights/main.bicep) — creates workspace-based Application Insights when `enableApplicationInsights = true`.
@@ -31,8 +31,8 @@ This scenario targets the subscription scope and composes reusable modules:
 
 The scenario layer is responsible for:
 
-* Deriving resource names from a single `name` parameter.
-* Composing inputs (default tags, model list, role definition IDs, default firewall rules/databases).
+* Deriving per-Foundry resource names from `name` + Foundry location.
+* Composing inputs (default tags, default model list, role definition IDs, default firewall rules/databases).
 * Feature-flagging observability via `enableApplicationInsights` and PostgreSQL via `enablePostgresql` (independent).
 * Surfacing module outputs (with empty values for disabled features).
 
@@ -54,7 +54,7 @@ The scenario layer is responsible for:
 | `tags` | `object` | `{ scenario: name, managedBy: 'bicep' }` | Tags applied to created resources. |
 | `enableApplicationInsights` | `bool` | `true` | When `true`, deploys Log Analytics + Application Insights, enables Foundry diagnostic settings, and registers App Insights as a Foundry tracing connection. |
 | `enablePostgresql` | `bool` | `true` | When `true`, deploys PostgreSQL Flexible Server with Entra ID-only authentication and optional pgvector. |
-| `models` | `array` | See `main.bicep` | Model deployments to create under the Foundry account. |
+| `foundries` | `array` | `[{}]` | Foundry deployments. Each item supports `{ location?, name?, models? }`. If omitted, one Foundry is deployed to scenario `location` with the default model list. |
 | `roleDefinitionIds` | `array` | `['5e0bd9bd-7b93-4f28-af87-19fc36ad61bd']` | Role definition GUIDs to assign at Foundry account scope. For each role, one role assignment is emitted per supplied identity in each identity array. |
 | `existingUserAssignedIdentities` | `array` | `[]` | Optional. Existing UAMIs to grant Foundry call permissions. Each item is `{ name: string, resourceGroup: string }`. |
 | `existingServicePrincipalObjectIds` | `array` | `[]` | Optional. Object (principal) IDs of existing Microsoft Entra service principals to grant Foundry call permissions. Use service principal object IDs (Enterprise Application), not application/client IDs. |
@@ -76,12 +76,12 @@ The scenario layer is responsible for:
 | `resourceGroupId` | `string` | Resource ID of the created resource group. |
 | `resourceGroupName` | `string` | Name of the created resource group. |
 | `resourceGroupLocation` | `string` | Location of the created resource group. |
-| `foundryAccountId` | `string` | Resource ID of the created Foundry account. |
-| `foundryAccountName` | `string` | Name of the created Foundry account. |
-| `foundryEndpoint` | `string` | Foundry endpoint (`https://<account>.cognitiveservices.azure.com/`). |
-| `foundryProjectId` | `string` | Resource ID of the created Foundry project. |
-| `foundryProjectName` | `string` | Name of the created Foundry project. |
-| `deployedModelNames` | `array` | Model deployment names requested by this scenario. |
+| `foundryAccountIds` | `array` | Resource IDs of created Foundry accounts. |
+| `foundryAccountNames` | `array` | Names of created Foundry accounts. |
+| `foundryEndpoints` | `array` | Foundry endpoints (`https://<account>.cognitiveservices.azure.com/`). |
+| `foundryProjectIds` | `array` | Resource IDs of created Foundry projects. |
+| `foundryProjectNames` | `array` | Names of created Foundry projects. |
+| `deployedModelNames` | `array` | Model deployment names grouped per Foundry: `[{ foundryAccountName, models[] }, ...]`. |
 | `logAnalyticsWorkspaceId` | `string` | Log Analytics workspace resource ID (empty when `enableApplicationInsights = false`). |
 | `applicationInsightsId` | `string` | Application Insights resource ID (empty when `enableApplicationInsights = false`). |
 | `applicationInsightsConnectionString` | `string` | Application Insights connection string for tracing (empty when `enableApplicationInsights = false`). |
@@ -116,10 +116,29 @@ The `ks6088ts-labs/concierge` repo typically expects these values in `.env` (or 
 
 | Scenario output | Typical usage |
 | --- | --- |
-| `foundryEndpoint` | Azure OpenAI / Foundry endpoint (e.g. `AZURE_OPENAI_ENDPOINT`) |
+| `foundryEndpoints[0]` | Azure OpenAI / Foundry endpoint (e.g. `AZURE_OPENAI_ENDPOINT`) |
 | `applicationInsightsConnectionString` | Application Insights connection string (e.g. `APPLICATIONINSIGHTS_CONNECTION_STRING`) |
 | `postgresServerFqdn` | PostgreSQL host (e.g. `POSTGRES_HOST`) |
 | `databaseNames[0]` | Database name (default: `appdb`) |
+
+### Multi-region Foundry example
+
+```bicep
+param foundries = [
+  {
+    location: 'japaneast'
+    models: [
+      { name: 'gpt-4o', modelName: 'gpt-4o', modelFormat: 'OpenAI', skuName: 'GlobalStandard', skuCapacity: 50 }
+    ]
+  }
+  {
+    location: 'eastus2'
+    models: [
+      { name: 'gpt-5', modelName: 'gpt-5', modelVersion: '2025-08-07', modelFormat: 'OpenAI', skuName: 'GlobalStandard', skuCapacity: 50 }
+    ]
+  }
+]
+```
 
 ## Authentication examples
 
@@ -191,4 +210,3 @@ infra/
 | Foundry | Account + project + model deployments + optional role assignments for UAMI/SP/user identities. |
 | Observability (`enableApplicationInsights`) | Log Analytics + workspace-based App Insights + Foundry tracing connection + Foundry diagnostic settings; also enables PostgreSQL diagnostic settings when PostgreSQL is enabled. |
 | PostgreSQL (`enablePostgresql`) | Entra ID-only Flexible Server + firewall rules + databases + optional pgvector configuration. |
-

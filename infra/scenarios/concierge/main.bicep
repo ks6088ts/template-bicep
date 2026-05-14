@@ -13,8 +13,34 @@ type uamiReference = {
   resourceGroup: string
 }
 
-@description('A (UAMI, role definition) pair generated for each role assignment iteration.')
-type uamiRolePair = {
+@description('Per-Foundry model deployment definition. Mirrors the shape accepted by the microsoft_foundry_model_deployment module.')
+type foundryModel = {
+  name: string
+  modelName: string
+  modelVersion: string?
+  modelFormat: string?
+  skuName: string?
+  skuCapacity: int?
+  raiPolicyName: string?
+}
+
+@description('A Microsoft Foundry account to provision. One AI Foundry account + one project will be created for each entry.')
+type foundryDeployment = {
+  @description('Optional. Azure region for this Foundry account. When omitted, falls back to the scenario-level `location`.')
+  location: string?
+
+  @description('Optional. Override for the Foundry account name. When omitted, derived from the scenario name and location.')
+  name: string?
+
+  @description('Optional. Models to deploy under this Foundry account. When omitted, the scenario-level default model list is used.')
+  models: foundryModel[]?
+}
+
+@description('A (foundry index, UAMI index, role definition) tuple generated for each role assignment iteration.')
+type foundryUamiRolePair = {
+  @description('Index of the Foundry in `effectiveFoundries` whose account scope receives the role assignment.')
+  foundryIndex: int
+
   @description('Index of the UAMI in `existingUserAssignedIdentities` whose principalId receives the role.')
   uamiIndex: int
 
@@ -22,13 +48,33 @@ type uamiRolePair = {
   roleDefinitionGuid: string
 }
 
-@description('A (principal object ID, role definition) pair generated for each service principal/user role assignment iteration.')
-type principalRolePair = {
+@description('A (foundry index, principal object ID, role definition) tuple generated for each service principal/user role assignment iteration.')
+type foundryPrincipalRolePair = {
+  @description('Index of the Foundry in `effectiveFoundries` whose account scope receives the role assignment.')
+  foundryIndex: int
+
   @description('The Microsoft Entra principal (object) ID that receives the role.')
   principalId: string
 
   @description('Role definition GUID to grant at Foundry account scope.')
   roleDefinitionGuid: string
+}
+
+@description('Resolved Foundry deployment settings after applying defaults and derived names.')
+type effectiveFoundryDeployment = {
+  location: string
+  name: string
+  projectName: string
+  diagnosticSettingsName: string
+  appInsightsConnectionName: string
+  models: foundryModel[]
+}
+
+@description('A flattened (Foundry, model) pair used for sequential model deployment loops.')
+type foundryModelPair = {
+  foundryIndex: int
+  foundryAccountName: string
+  model: foundryModel
 }
 
 // ------------------
@@ -55,37 +101,10 @@ param enableApplicationInsights bool = true
 @description('Feature flag: when true, deploys PostgreSQL Flexible Server (Entra ID-only) with optional pgvector and diagnostic settings.')
 param enablePostgresql bool = true
 
-@description('The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs.')
-param models array = [
-  {
-    name: 'gpt-4o'
-    modelName: 'gpt-4o'
-    modelFormat: 'OpenAI'
-    skuName: 'GlobalStandard'
-    skuCapacity: 50
-  }
-  {
-    name: 'gpt-5'
-    modelName: 'gpt-5'
-    modelVersion: '2025-08-07'
-    modelFormat: 'OpenAI'
-    skuName: 'GlobalStandard'
-    skuCapacity: 50
-  }
-  {
-    name: 'text-embedding-3-large'
-    modelName: 'text-embedding-3-large'
-    modelFormat: 'OpenAI'
-    skuName: 'Standard'
-    skuCapacity: 50
-  }
-  {
-    name: 'text-embedding-3-small'
-    modelName: 'text-embedding-3-small'
-    modelFormat: 'OpenAI'
-    skuName: 'Standard'
-    skuCapacity: 50
-  }
+@description('Microsoft Foundry accounts to provision. Defaults to a single Foundry at the scenario `location` with the default model list, preserving the previous behavior.')
+@minLength(1)
+param foundries foundryDeployment[] = [
+  {}
 ]
 
 @description('Role definition GUIDs assigned to every existing UAMI, service principal, and user at Azure AI Foundry account scope.')
@@ -157,42 +176,133 @@ param databases array = [
 // ------------------
 
 var resourceGroupName = 'rg-${name}'
-var foundryAccountName = take(toLower(replace('aif-${name}', '_', '-')), 59)
-var foundryProjectName = take('proj-${name}', 64)
 var postgresServerName = take(toLower(replace('psql-${name}', '_', '-')), 63)
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var applicationInsightsName = take(toLower(replace('appi-${name}', '_', '-')), 260)
-var foundryDiagnosticSettingsName = take('diag-${foundryAccountName}', 64)
 var postgresDiagnosticSettingsName = take('diag-${postgresServerName}', 256)
-var foundryAppInsightsConnectionName = take('appinsights-${foundryProjectName}', 64)
 
-// Cross-product each identity array with `roleDefinitionIds` into a flat list of struct pairs.
-// `map`/`flatten` keep the cross product readable and naturally produce an empty list when the
-// identity array is empty, so no flag variables or `if` guards are required at the loop sites.
-var uamiRolePairs uamiRolePair[] = flatten(map(
-  range(0, length(existingUserAssignedIdentities)),
-  uamiIndex =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
-      uamiIndex: uamiIndex
-      roleDefinitionGuid: roleDefinitionGuid
-    })
+var defaultFoundryModels foundryModel[] = [
+  {
+    name: 'gpt-4o'
+    modelName: 'gpt-4o'
+    modelFormat: 'OpenAI'
+    skuName: 'GlobalStandard'
+    skuCapacity: 50
+  }
+  {
+    name: 'gpt-5'
+    modelName: 'gpt-5'
+    modelVersion: '2025-08-07'
+    modelFormat: 'OpenAI'
+    skuName: 'GlobalStandard'
+    skuCapacity: 50
+  }
+  {
+    name: 'text-embedding-3-large'
+    modelName: 'text-embedding-3-large'
+    modelFormat: 'OpenAI'
+    skuName: 'Standard'
+    skuCapacity: 50
+  }
+  {
+    name: 'text-embedding-3-small'
+    modelName: 'text-embedding-3-small'
+    modelFormat: 'OpenAI'
+    skuName: 'Standard'
+    skuCapacity: 50
+  }
+]
+
+var foundryLocations string[] = [for foundry in foundries: string(foundry.?location ?? location)]
+var normalizedFoundryLocations string[] = [
+  for foundryLocation in foundryLocations: replace(toLower(foundryLocation), ' ', '')
+]
+var foundryLocationEntryCounts int[] = [
+  for i in range(0, length(foundries)): length(filter(
+    range(0, length(foundries)),
+    j => normalizedFoundryLocations[j] == normalizedFoundryLocations[i]
+  ))
+]
+var foundryLocationSuffixes string[] = [
+  for i in range(0, length(foundries)): foundryLocationEntryCounts[i] > 1 ? '-${i}' : ''
+]
+var derivedFoundryAccountNames string[] = [
+  for i in range(0, length(foundries)): take(
+    toLower(replace('aif-${name}-${normalizedFoundryLocations[i]}${foundryLocationSuffixes[i]}', '_', '-')),
+    59
+  )
+]
+var derivedFoundryProjectNames string[] = [
+  for i in range(0, length(foundries)): take(
+    'proj-${name}-${normalizedFoundryLocations[i]}${foundryLocationSuffixes[i]}',
+    64
+  )
+]
+
+var effectiveFoundries effectiveFoundryDeployment[] = [
+  for i in range(0, length(foundries)): {
+    location: foundryLocations[i]
+    name: !empty(string(foundries[i].?name ?? '')) ? string(foundries[i].?name ?? '') : derivedFoundryAccountNames[i]
+    projectName: derivedFoundryProjectNames[i]
+    diagnosticSettingsName: take(
+      'diag-${!empty(string(foundries[i].?name ?? '')) ? string(foundries[i].?name ?? '') : derivedFoundryAccountNames[i]}',
+      64
+    )
+    appInsightsConnectionName: take('appinsights-${derivedFoundryProjectNames[i]}', 64)
+    models: foundries[i].?models ?? defaultFoundryModels
+  }
+]
+
+// Cross-product each identity array with `roleDefinitionIds` and each Foundry into a flat list of struct pairs.
+var uamiRolePairs foundryUamiRolePair[] = flatten(map(
+  range(0, length(effectiveFoundries)),
+  foundryIndex =>
+    flatten(map(
+      range(0, length(existingUserAssignedIdentities)),
+      uamiIndex =>
+        map(roleDefinitionIds, roleDefinitionGuid => {
+          foundryIndex: foundryIndex
+          uamiIndex: uamiIndex
+          roleDefinitionGuid: roleDefinitionGuid
+        })
+    ))
 ))
 
-var servicePrincipalRolePairs principalRolePair[] = flatten(map(
-  existingServicePrincipalObjectIds,
-  principalId =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
-      principalId: principalId
-      roleDefinitionGuid: roleDefinitionGuid
-    })
+var servicePrincipalRolePairs foundryPrincipalRolePair[] = flatten(map(
+  range(0, length(effectiveFoundries)),
+  foundryIndex =>
+    flatten(map(
+      existingServicePrincipalObjectIds,
+      principalId =>
+        map(roleDefinitionIds, roleDefinitionGuid => {
+          foundryIndex: foundryIndex
+          principalId: principalId
+          roleDefinitionGuid: roleDefinitionGuid
+        })
+    ))
 ))
 
-var userRolePairs principalRolePair[] = flatten(map(
-  existingUserObjectIds,
-  principalId =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
-      principalId: principalId
-      roleDefinitionGuid: roleDefinitionGuid
+var userRolePairs foundryPrincipalRolePair[] = flatten(map(
+  range(0, length(effectiveFoundries)),
+  foundryIndex =>
+    flatten(map(
+      existingUserObjectIds,
+      principalId =>
+        map(roleDefinitionIds, roleDefinitionGuid => {
+          foundryIndex: foundryIndex
+          principalId: principalId
+          roleDefinitionGuid: roleDefinitionGuid
+        })
+    ))
+))
+
+var foundryModelPairs foundryModelPair[] = flatten(map(
+  range(0, length(effectiveFoundries)),
+  i =>
+    map(effectiveFoundries[i].models, model => {
+      foundryIndex: i
+      foundryAccountName: effectiveFoundries[i].name
+      model: model
     })
 ))
 
@@ -233,32 +343,36 @@ module resourceGroup '../../modules/resource_group/main.bicep' = {
   }
 }
 
-module foundryAccount '../../modules/microsoft_foundry/main.bicep' = {
-  name: take('${name}-foundry-account-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    #disable-next-line BCP334
-    name: foundryAccountName
-    location: location
-    tags: tags
-    disableLocalAuth: disableLocalAuth
+module foundryAccounts '../../modules/microsoft_foundry/main.bicep' = [
+  for (foundry, i) in effectiveFoundries: {
+    name: take('${name}-foundry-${i}-account-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      #disable-next-line BCP334
+      name: foundry.name
+      location: foundry.location
+      tags: tags
+      disableLocalAuth: disableLocalAuth
+    }
+    dependsOn: [resourceGroup]
   }
-  dependsOn: [resourceGroup]
-}
+]
 
-module foundryProject '../../modules/microsoft_foundry_project/main.bicep' = {
-  name: take('${name}-foundry-project-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    #disable-next-line BCP334
-    parentAccountName: foundryAccountName
-    name: foundryProjectName
-    location: location
-    displayName: foundryProjectName
-    tags: tags
+module foundryProjects '../../modules/microsoft_foundry_project/main.bicep' = [
+  for (foundry, i) in effectiveFoundries: {
+    name: take('${name}-foundry-${i}-project-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      #disable-next-line BCP334
+      parentAccountName: foundry.name
+      name: foundry.projectName
+      location: foundry.location
+      displayName: foundry.projectName
+      tags: tags
+    }
+    dependsOn: [foundryAccounts[i]]
   }
-  dependsOn: [foundryAccount]
-}
+]
 
 module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' = if (enableApplicationInsights) {
   name: take('${name}-law-deployment', 64)
@@ -284,71 +398,75 @@ module applicationInsights '../../modules/application_insights/main.bicep' = if 
   }
 }
 
-module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' = if (enableApplicationInsights) {
-  name: take('${name}-diag-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    name: foundryDiagnosticSettingsName
-    workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
-    #disable-next-line BCP334
-    targetAccountName: foundryAccountName
+module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' = [
+  for (foundry, i) in effectiveFoundries: if (enableApplicationInsights) {
+    name: take('${name}-foundry-${i}-diag-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      name: foundry.diagnosticSettingsName
+      workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
+      #disable-next-line BCP334
+      targetAccountName: foundry.name
+    }
+    dependsOn: [
+      foundryAccounts[i]
+    ]
   }
-  dependsOn: [
-    foundryAccount
-  ]
-}
+]
 
-module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/main.bicep' = if (enableApplicationInsights) {
-  name: take('${name}-appinsights-connection-deployment', 64)
-  scope: az.resourceGroup(resourceGroupName)
-  params: {
-    #disable-next-line BCP334
-    parentAccountName: foundryAccountName
-    name: foundryAppInsightsConnectionName
-    parentProjectName: foundryProjectName
-    category: 'AppInsights'
-    target: applicationInsights.?outputs.id ?? ''
-    credentialKey: applicationInsights.?outputs.connectionString ?? ''
-    resourceId: applicationInsights.?outputs.id ?? ''
-    location: location
-    isSharedToAll: false
-  }
-  dependsOn: [
-    foundryProject
-  ]
-}
-
-@batchSize(1)
-module modelDeployments '../../modules/microsoft_foundry_model_deployment/main.bicep' = [
-  for (model, i) in models: {
-    name: take('${name}-model-${i}-deployment', 64)
+module foundryAppInsightsConnections '../../modules/microsoft_foundry_connection/main.bicep' = [
+  for (foundry, i) in effectiveFoundries: if (enableApplicationInsights) {
+    name: take('${name}-foundry-${i}-appinsights-connection-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
       #disable-next-line BCP334
-      parentAccountName: foundryAccountName
-      name: model.name
-      modelName: model.modelName
-      modelVersion: string(model.?modelVersion ?? '')
-      modelFormat: string(model.?modelFormat ?? 'OpenAI')
-      skuName: string(model.?skuName ?? 'GlobalStandard')
-      skuCapacity: int(model.?skuCapacity ?? 50)
-      raiPolicyName: string(model.?raiPolicyName ?? '')
+      parentAccountName: foundry.name
+      name: foundry.appInsightsConnectionName
+      parentProjectName: foundry.projectName
+      category: 'AppInsights'
+      target: applicationInsights.?outputs.id ?? ''
+      credentialKey: applicationInsights.?outputs.connectionString ?? ''
+      resourceId: applicationInsights.?outputs.id ?? ''
+      location: location
+      isSharedToAll: false
     }
-    dependsOn: [foundryProject]
+    dependsOn: [
+      foundryProjects[i]
+    ]
+  }
+]
+
+@batchSize(1)
+module modelDeployments '../../modules/microsoft_foundry_model_deployment/main.bicep' = [
+  for (pair, i) in foundryModelPairs: {
+    name: take('${name}-foundry-${pair.foundryIndex}-model-${i}-deployment', 64)
+    scope: az.resourceGroup(resourceGroupName)
+    params: {
+      #disable-next-line BCP334
+      parentAccountName: pair.foundryAccountName
+      name: pair.model.name
+      modelName: pair.model.modelName
+      modelVersion: string(pair.model.?modelVersion ?? '')
+      modelFormat: string(pair.model.?modelFormat ?? 'OpenAI')
+      skuName: string(pair.model.?skuName ?? 'GlobalStandard')
+      skuCapacity: int(pair.model.?skuCapacity ?? 50)
+      raiPolicyName: string(pair.model.?raiPolicyName ?? '')
+    }
+    dependsOn: [foundryProjects[pair.foundryIndex]]
   }
 ]
 
 module uamiRoleAssignments '../../modules/role_assignment/main.bicep' = [
   for (pair, i) in uamiRolePairs: {
-    name: take('${name}-uami-role-${i}-deployment', 64)
+    name: take('${name}-foundry-${pair.foundryIndex}-uami-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
       #disable-next-line BCP334
-      targetAccountName: foundryAccountName
+      targetAccountName: effectiveFoundries[pair.foundryIndex].name
       principalId: uamis[pair.uamiIndex].properties.principalId
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
       roleAssignmentNameSeed: guid(
-        foundryAccount.outputs.id,
+        foundryAccounts[pair.foundryIndex].outputs.id,
         uamis[pair.uamiIndex].properties.principalId,
         pair.roleDefinitionGuid
       )
@@ -359,14 +477,18 @@ module uamiRoleAssignments '../../modules/role_assignment/main.bicep' = [
 
 module servicePrincipalRoleAssignments '../../modules/role_assignment/main.bicep' = [
   for (pair, i) in servicePrincipalRolePairs: {
-    name: take('${name}-sp-role-${i}-deployment', 64)
+    name: take('${name}-foundry-${pair.foundryIndex}-sp-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
       #disable-next-line BCP334
-      targetAccountName: foundryAccountName
+      targetAccountName: effectiveFoundries[pair.foundryIndex].name
       principalId: pair.principalId
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
-      roleAssignmentNameSeed: guid(foundryAccount.outputs.id, pair.principalId, pair.roleDefinitionGuid)
+      roleAssignmentNameSeed: guid(
+        foundryAccounts[pair.foundryIndex].outputs.id,
+        pair.principalId,
+        pair.roleDefinitionGuid
+      )
       principalType: 'ServicePrincipal'
     }
   }
@@ -374,14 +496,18 @@ module servicePrincipalRoleAssignments '../../modules/role_assignment/main.bicep
 
 module userRoleAssignments '../../modules/role_assignment/main.bicep' = [
   for (pair, i) in userRolePairs: {
-    name: take('${name}-user-role-${i}-deployment', 64)
+    name: take('${name}-foundry-${pair.foundryIndex}-user-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
       #disable-next-line BCP334
-      targetAccountName: foundryAccountName
+      targetAccountName: effectiveFoundries[pair.foundryIndex].name
       principalId: pair.principalId
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
-      roleAssignmentNameSeed: guid(foundryAccount.outputs.id, pair.principalId, pair.roleDefinitionGuid)
+      roleAssignmentNameSeed: guid(
+        foundryAccounts[pair.foundryIndex].outputs.id,
+        pair.principalId,
+        pair.roleDefinitionGuid
+      )
       principalType: 'User'
     }
   }
@@ -432,23 +558,28 @@ output resourceGroupName string = resourceGroup.outputs.name
 @description('The location of the created resource group')
 output resourceGroupLocation string = resourceGroup.outputs.location
 
-@description('The resource ID of the created Azure AI Foundry account')
-output foundryAccountId string = foundryAccount.outputs.id
+@description('The resource IDs of created Azure AI Foundry accounts')
+output foundryAccountIds string[] = [for i in range(0, length(effectiveFoundries)): foundryAccounts[i].outputs.id]
 
-@description('The name of the created Azure AI Foundry account')
-output foundryAccountName string = foundryAccount.outputs.name
+@description('The names of created Azure AI Foundry accounts')
+output foundryAccountNames string[] = [for i in range(0, length(effectiveFoundries)): foundryAccounts[i].outputs.name]
 
-@description('The endpoint of the created Azure AI Foundry account')
-output foundryEndpoint string = foundryAccount.outputs.endpoint
+@description('The endpoints of created Azure AI Foundry accounts')
+output foundryEndpoints string[] = [for i in range(0, length(effectiveFoundries)): foundryAccounts[i].outputs.endpoint]
 
-@description('The resource ID of the created Azure AI Foundry project')
-output foundryProjectId string = foundryProject.outputs.id
+@description('The resource IDs of created Azure AI Foundry projects')
+output foundryProjectIds string[] = [for i in range(0, length(effectiveFoundries)): foundryProjects[i].outputs.id]
 
-@description('The name of the created Azure AI Foundry project')
-output foundryProjectName string = foundryProject.outputs.name
+@description('The names of created Azure AI Foundry projects')
+output foundryProjectNames string[] = [for i in range(0, length(effectiveFoundries)): foundryProjects[i].outputs.name]
 
-@description('The names of model deployments requested by this scenario')
-output deployedModelNames array = [for model in models: model.name]
+@description('Model deployment names grouped by Foundry account')
+output deployedModelNames array = [
+  for (foundry, i) in effectiveFoundries: {
+    foundryAccountName: foundry.name
+    models: map(filter(foundryModelPairs, pair => pair.foundryIndex == i), pair => pair.model.name)
+  }
+]
 
 @description('The resource ID of the created Log Analytics workspace (empty when Application Insights is disabled)')
 output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.?outputs.id ?? ''

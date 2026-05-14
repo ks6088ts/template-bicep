@@ -20,15 +20,24 @@ param disableLocalAuth = true
 // PostgreSQL Entra administrator falls back to deployer() when omitted, so this
 // file is deployable as-is.
 
-// Optional: override Foundry model deployments.
-// Adjust models (for example skuCapacity or modelName) to match target region availability and quota.
-// param models = [
+// Optional: override Foundry deployments.
+// By default, `foundries` is omitted and main.bicep deploys one Foundry in `location`
+// with the built-in default model list.
+//
+// Example: deploy a Japan East Foundry for gpt-4o + a US Foundry for gpt-5
+// param foundries = [
 //   {
-//     name: 'gpt-4o'
-//     modelName: 'gpt-4o'
-//     modelFormat: 'OpenAI'
-//     skuName: 'GlobalStandard'
-//     skuCapacity: 50
+//     location: 'japaneast'
+//     models: [
+//       { name: 'gpt-4o', modelName: 'gpt-4o', modelFormat: 'OpenAI', skuName: 'GlobalStandard', skuCapacity: 50 }
+//       { name: 'text-embedding-3-large', modelName: 'text-embedding-3-large', modelFormat: 'OpenAI', skuName: 'Standard', skuCapacity: 50 }
+//     ]
+//   }
+//   {
+//     location: 'eastus2'
+//     models: [
+//       { name: 'gpt-5', modelName: 'gpt-5', modelVersion: '2025-08-07', modelFormat: 'OpenAI', skuName: 'GlobalStandard', skuCapacity: 50 }
+//     ]
 //   }
 // ]
 
@@ -67,4 +76,3 @@ param disableLocalAuth = true
 //   { name: 'appdb' }
 //   { name: 'vectordb' }
 // ]
-

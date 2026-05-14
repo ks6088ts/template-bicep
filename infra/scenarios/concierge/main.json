@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.43.8.12551",
-      "templateHash": "14935199973594776003"
+      "version": "0.42.1.51946",
+      "templateHash": "11004846236997789678"
     }
   },
   "definitions": {
@@ -30,9 +30,81 @@
         "description": "Reference to an existing User Assigned Managed Identity (UAMI)."
       }
     },
-    "uamiRolePair": {
+    "foundryModel": {
       "type": "object",
       "properties": {
+        "name": {
+          "type": "string"
+        },
+        "modelName": {
+          "type": "string"
+        },
+        "modelVersion": {
+          "type": "string",
+          "nullable": true
+        },
+        "modelFormat": {
+          "type": "string",
+          "nullable": true
+        },
+        "skuName": {
+          "type": "string",
+          "nullable": true
+        },
+        "skuCapacity": {
+          "type": "int",
+          "nullable": true
+        },
+        "raiPolicyName": {
+          "type": "string",
+          "nullable": true
+        }
+      },
+      "metadata": {
+        "description": "Per-Foundry model deployment definition. Mirrors the shape accepted by the microsoft_foundry_model_deployment module."
+      }
+    },
+    "foundryDeployment": {
+      "type": "object",
+      "properties": {
+        "location": {
+          "type": "string",
+          "nullable": true,
+          "metadata": {
+            "description": "Optional. Azure region for this Foundry account. When omitted, falls back to the scenario-level `location`."
+          }
+        },
+        "name": {
+          "type": "string",
+          "nullable": true,
+          "metadata": {
+            "description": "Optional. Override for the Foundry account name. When omitted, derived from the scenario name and location."
+          }
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/foundryModel"
+          },
+          "nullable": true,
+          "metadata": {
+            "description": "Optional. Models to deploy under this Foundry account. When omitted, the scenario-level default model list is used."
+          }
+        }
+      },
+      "metadata": {
+        "description": "A Microsoft Foundry account to provision. One AI Foundry account + one project will be created for each entry."
+      }
+    },
+    "foundryUamiRolePair": {
+      "type": "object",
+      "properties": {
+        "foundryIndex": {
+          "type": "int",
+          "metadata": {
+            "description": "Index of the Foundry in `effectiveFoundries` whose account scope receives the role assignment."
+          }
+        },
         "uamiIndex": {
           "type": "int",
           "metadata": {
@@ -47,12 +119,18 @@
         }
       },
       "metadata": {
-        "description": "A (UAMI, role definition) pair generated for each role assignment iteration."
+        "description": "A (foundry index, UAMI index, role definition) tuple generated for each role assignment iteration."
       }
     },
-    "principalRolePair": {
+    "foundryPrincipalRolePair": {
       "type": "object",
       "properties": {
+        "foundryIndex": {
+          "type": "int",
+          "metadata": {
+            "description": "Index of the Foundry in `effectiveFoundries` whose account scope receives the role assignment."
+          }
+        },
         "principalId": {
           "type": "string",
           "metadata": {
@@ -67,7 +145,53 @@
         }
       },
       "metadata": {
-        "description": "A (principal object ID, role definition) pair generated for each service principal/user role assignment iteration."
+        "description": "A (foundry index, principal object ID, role definition) tuple generated for each service principal/user role assignment iteration."
+      }
+    },
+    "effectiveFoundryDeployment": {
+      "type": "object",
+      "properties": {
+        "location": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "diagnosticSettingsName": {
+          "type": "string"
+        },
+        "appInsightsConnectionName": {
+          "type": "string"
+        },
+        "models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/foundryModel"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Resolved Foundry deployment settings after applying defaults and derived names."
+      }
+    },
+    "foundryModelPair": {
+      "type": "object",
+      "properties": {
+        "foundryIndex": {
+          "type": "int"
+        },
+        "foundryAccountName": {
+          "type": "string"
+        },
+        "model": {
+          "$ref": "#/definitions/foundryModel"
+        }
+      },
+      "metadata": {
+        "description": "A flattened (Foundry, model) pair used for sequential model deployment loops."
       }
     }
   },
@@ -110,41 +234,17 @@
         "description": "Feature flag: when true, deploys PostgreSQL Flexible Server (Entra ID-only) with optional pgvector and diagnostic settings."
       }
     },
-    "models": {
+    "foundries": {
       "type": "array",
+      "items": {
+        "$ref": "#/definitions/foundryDeployment"
+      },
       "defaultValue": [
-        {
-          "name": "gpt-4o",
-          "modelName": "gpt-4o",
-          "modelFormat": "OpenAI",
-          "skuName": "GlobalStandard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "gpt-5",
-          "modelName": "gpt-5",
-          "modelVersion": "2025-08-07",
-          "modelFormat": "OpenAI",
-          "skuName": "GlobalStandard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "text-embedding-3-large",
-          "modelName": "text-embedding-3-large",
-          "modelFormat": "OpenAI",
-          "skuName": "Standard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "text-embedding-3-small",
-          "modelName": "text-embedding-3-small",
-          "modelFormat": "OpenAI",
-          "skuName": "Standard",
-          "skuCapacity": 50
-        }
+        {}
       ],
+      "minLength": 1,
       "metadata": {
-        "description": "The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs."
+        "description": "Microsoft Foundry accounts to provision. Defaults to a single Foundry at the scenario `location` with the default model list, preserving the previous behavior."
       }
     },
     "roleDefinitionIds": {
@@ -300,18 +400,90 @@
     }
   },
   "variables": {
+    "copy": [
+      {
+        "name": "foundryLocations",
+        "count": "[length(parameters('foundries'))]",
+        "input": "[string(coalesce(tryGet(parameters('foundries')[copyIndex('foundryLocations')], 'location'), parameters('location')))]"
+      },
+      {
+        "name": "normalizedFoundryLocations",
+        "count": "[length(variables('foundryLocations'))]",
+        "input": "[replace(toLower(variables('foundryLocations')[copyIndex('normalizedFoundryLocations')]), ' ', '')]"
+      },
+      {
+        "name": "foundryLocationEntryCounts",
+        "count": "[length(range(0, length(parameters('foundries'))))]",
+        "input": "[length(filter(range(0, length(parameters('foundries'))), lambda('j', equals(variables('normalizedFoundryLocations')[lambdaVariables('j')], variables('normalizedFoundryLocations')[range(0, length(parameters('foundries')))[copyIndex('foundryLocationEntryCounts')]]))))]"
+      },
+      {
+        "name": "foundryLocationSuffixes",
+        "count": "[length(range(0, length(parameters('foundries'))))]",
+        "input": "[if(greater(variables('foundryLocationEntryCounts')[range(0, length(parameters('foundries')))[copyIndex('foundryLocationSuffixes')]], 1), format('-{0}', range(0, length(parameters('foundries')))[copyIndex('foundryLocationSuffixes')]), '')]"
+      },
+      {
+        "name": "derivedFoundryAccountNames",
+        "count": "[length(range(0, length(parameters('foundries'))))]",
+        "input": "[take(toLower(replace(format('aif-{0}-{1}{2}', parameters('name'), variables('normalizedFoundryLocations')[range(0, length(parameters('foundries')))[copyIndex('derivedFoundryAccountNames')]], variables('foundryLocationSuffixes')[range(0, length(parameters('foundries')))[copyIndex('derivedFoundryAccountNames')]]), '_', '-')), 59)]"
+      },
+      {
+        "name": "derivedFoundryProjectNames",
+        "count": "[length(range(0, length(parameters('foundries'))))]",
+        "input": "[take(format('proj-{0}-{1}{2}', parameters('name'), variables('normalizedFoundryLocations')[range(0, length(parameters('foundries')))[copyIndex('derivedFoundryProjectNames')]], variables('foundryLocationSuffixes')[range(0, length(parameters('foundries')))[copyIndex('derivedFoundryProjectNames')]]), 64)]"
+      },
+      {
+        "name": "effectiveFoundries",
+        "count": "[length(range(0, length(parameters('foundries'))))]",
+        "input": {
+          "location": "[variables('foundryLocations')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]]]",
+          "name": "[if(not(empty(string(coalesce(tryGet(parameters('foundries')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]], 'name'), '')))), string(coalesce(tryGet(parameters('foundries')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]], 'name'), '')), variables('derivedFoundryAccountNames')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]])]",
+          "projectName": "[variables('derivedFoundryProjectNames')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]]]",
+          "diagnosticSettingsName": "[take(format('diag-{0}', if(not(empty(string(coalesce(tryGet(parameters('foundries')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]], 'name'), '')))), string(coalesce(tryGet(parameters('foundries')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]], 'name'), '')), variables('derivedFoundryAccountNames')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]])), 64)]",
+          "appInsightsConnectionName": "[take(format('appinsights-{0}', variables('derivedFoundryProjectNames')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]]), 64)]",
+          "models": "[coalesce(tryGet(parameters('foundries')[range(0, length(parameters('foundries')))[copyIndex('effectiveFoundries')]], 'models'), variables('defaultFoundryModels'))]"
+        }
+      }
+    ],
     "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
-    "foundryAccountName": "[take(toLower(replace(format('aif-{0}', parameters('name')), '_', '-')), 59)]",
-    "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]",
     "postgresServerName": "[take(toLower(replace(format('psql-{0}', parameters('name')), '_', '-')), 63)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
     "applicationInsightsName": "[take(toLower(replace(format('appi-{0}', parameters('name')), '_', '-')), 260)]",
-    "foundryDiagnosticSettingsName": "[take(format('diag-{0}', variables('foundryAccountName')), 64)]",
     "postgresDiagnosticSettingsName": "[take(format('diag-{0}', variables('postgresServerName')), 256)]",
-    "foundryAppInsightsConnectionName": "[take(format('appinsights-{0}', variables('foundryProjectName')), 64)]",
-    "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
-    "servicePrincipalRolePairs": "[flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
-    "userRolePairs": "[flatten(map(parameters('existingUserObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
+    "defaultFoundryModels": [
+      {
+        "name": "gpt-4o",
+        "modelName": "gpt-4o",
+        "modelFormat": "OpenAI",
+        "skuName": "GlobalStandard",
+        "skuCapacity": 50
+      },
+      {
+        "name": "gpt-5",
+        "modelName": "gpt-5",
+        "modelVersion": "2025-08-07",
+        "modelFormat": "OpenAI",
+        "skuName": "GlobalStandard",
+        "skuCapacity": 50
+      },
+      {
+        "name": "text-embedding-3-large",
+        "modelName": "text-embedding-3-large",
+        "modelFormat": "OpenAI",
+        "skuName": "Standard",
+        "skuCapacity": 50
+      },
+      {
+        "name": "text-embedding-3-small",
+        "modelName": "text-embedding-3-small",
+        "modelFormat": "OpenAI",
+        "skuName": "Standard",
+        "skuCapacity": 50
+      }
+    ],
+    "uamiRolePairs": "[flatten(map(range(0, length(variables('effectiveFoundries'))), lambda('foundryIndex', flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('foundryIndex', lambdaVariables('foundryIndex'), 'uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid'))))))))))]",
+    "servicePrincipalRolePairs": "[flatten(map(range(0, length(variables('effectiveFoundries'))), lambda('foundryIndex', flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('foundryIndex', lambdaVariables('foundryIndex'), 'principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid'))))))))))]",
+    "userRolePairs": "[flatten(map(range(0, length(variables('effectiveFoundries'))), lambda('foundryIndex', flatten(map(parameters('existingUserObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('foundryIndex', lambdaVariables('foundryIndex'), 'principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid'))))))))))]",
+    "foundryModelPairs": "[flatten(map(range(0, length(variables('effectiveFoundries'))), lambda('i', map(variables('effectiveFoundries')[lambdaVariables('i')].models, lambda('model', createObject('foundryIndex', lambdaVariables('i'), 'foundryAccountName', variables('effectiveFoundries')[lambdaVariables('i')].name, 'model', lambdaVariables('model')))))))]",
     "deployerInfo": "[deployer()]",
     "deployerUserPrincipalName": "[coalesce(tryGet(variables('deployerInfo'), 'userPrincipalName'), '')]",
     "effectiveEntraAdministrator": "[coalesce(parameters('entraAdministrator'), createObject('objectId', variables('deployerInfo').objectId, 'principalName', if(empty(variables('deployerUserPrincipalName')), variables('deployerInfo').objectId, variables('deployerUserPrincipalName')), 'principalType', if(empty(variables('deployerUserPrincipalName')), 'ServicePrincipal', 'User'), 'tenantId', variables('deployerInfo').tenantId))]"
@@ -355,8 +527,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "13006231347032579543"
+              "version": "0.42.1.51946",
+              "templateHash": "10375022168103187164"
             }
           },
           "parameters": {
@@ -417,10 +589,14 @@
         }
       }
     },
-    "foundryAccount": {
+    "foundryAccounts": {
+      "copy": {
+        "name": "foundryAccounts",
+        "count": "[length(variables('effectiveFoundries'))]"
+      },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-foundry-account-deployment', parameters('name')), 64)]",
+      "name": "[take(format('{0}-foundry-{1}-account-deployment', parameters('name'), copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -429,10 +605,10 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].name]"
           },
           "location": {
-            "value": "[parameters('location')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].location]"
           },
           "tags": {
             "value": "[parameters('tags')]"
@@ -447,8 +623,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "18281413229281920123"
+              "version": "0.42.1.51946",
+              "templateHash": "15661186683057703240"
             }
           },
           "parameters": {
@@ -559,10 +735,14 @@
         "resourceGroup"
       ]
     },
-    "foundryProject": {
+    "foundryProjects": {
+      "copy": {
+        "name": "foundryProjects",
+        "count": "[length(variables('effectiveFoundries'))]"
+      },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-foundry-project-deployment', parameters('name')), 64)]",
+      "name": "[take(format('{0}-foundry-{1}-project-deployment', parameters('name'), copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -571,16 +751,16 @@
         "mode": "Incremental",
         "parameters": {
           "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].name]"
           },
           "name": {
-            "value": "[variables('foundryProjectName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].projectName]"
           },
           "location": {
-            "value": "[parameters('location')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].location]"
           },
           "displayName": {
-            "value": "[variables('foundryProjectName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].projectName]"
           },
           "tags": {
             "value": "[parameters('tags')]"
@@ -592,8 +772,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "14892820478045566648"
+              "version": "0.42.1.51946",
+              "templateHash": "10198835172886096054"
             }
           },
           "parameters": {
@@ -676,7 +856,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount"
+        "[format('foundryAccounts[{0}]', copyIndex())]"
       ]
     },
     "logAnalyticsWorkspace": {
@@ -707,8 +887,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "15282767757597819840"
+              "version": "0.42.1.51946",
+              "templateHash": "9009423525462246214"
             }
           },
           "parameters": {
@@ -811,8 +991,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "14177430626936703635"
+              "version": "0.42.1.51946",
+              "templateHash": "5780734512434141150"
             }
           },
           "parameters": {
@@ -889,10 +1069,14 @@
       ]
     },
     "foundryDiagnosticSettings": {
+      "copy": {
+        "name": "foundryDiagnosticSettings",
+        "count": "[length(variables('effectiveFoundries'))]"
+      },
       "condition": "[parameters('enableApplicationInsights')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-diag-deployment', parameters('name')), 64)]",
+      "name": "[take(format('{0}-foundry-{1}-diag-deployment', parameters('name'), copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -901,13 +1085,13 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('foundryDiagnosticSettingsName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].diagnosticSettingsName]"
           },
           "workspaceResourceId": {
             "value": "[coalesce(tryGet(if(parameters('enableApplicationInsights'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
           },
           "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].name]"
           }
         },
         "template": {
@@ -916,8 +1100,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "12549242387600695814"
+              "version": "0.42.1.51946",
+              "templateHash": "5247795374404343839"
             }
           },
           "parameters": {
@@ -1020,15 +1204,19 @@
         }
       },
       "dependsOn": [
-        "foundryAccount",
+        "[format('foundryAccounts[{0}]', copyIndex())]",
         "logAnalyticsWorkspace"
       ]
     },
-    "foundryAppInsightsConnection": {
+    "foundryAppInsightsConnections": {
+      "copy": {
+        "name": "foundryAppInsightsConnections",
+        "count": "[length(variables('effectiveFoundries'))]"
+      },
       "condition": "[parameters('enableApplicationInsights')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-appinsights-connection-deployment', parameters('name')), 64)]",
+      "name": "[take(format('{0}-foundry-{1}-appinsights-connection-deployment', parameters('name'), copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1037,13 +1225,13 @@
         "mode": "Incremental",
         "parameters": {
           "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].name]"
           },
           "name": {
-            "value": "[variables('foundryAppInsightsConnectionName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].appInsightsConnectionName]"
           },
           "parentProjectName": {
-            "value": "[variables('foundryProjectName')]"
+            "value": "[variables('effectiveFoundries')[copyIndex()].projectName]"
           },
           "category": {
             "value": "AppInsights"
@@ -1070,8 +1258,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "14748774820262903127"
+              "version": "0.42.1.51946",
+              "templateHash": "11421745627715216901"
             }
           },
           "parameters": {
@@ -1169,19 +1357,19 @@
       },
       "dependsOn": [
         "applicationInsights",
-        "foundryProject"
+        "[format('foundryProjects[{0}]', copyIndex())]"
       ]
     },
     "modelDeployments": {
       "copy": {
         "name": "modelDeployments",
-        "count": "[length(parameters('models'))]",
+        "count": "[length(variables('foundryModelPairs'))]",
         "mode": "serial",
         "batchSize": 1
       },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-model-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "name": "[take(format('{0}-foundry-{1}-model-{2}-deployment', parameters('name'), variables('foundryModelPairs')[copyIndex()].foundryIndex, copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1190,28 +1378,28 @@
         "mode": "Incremental",
         "parameters": {
           "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('foundryModelPairs')[copyIndex()].foundryAccountName]"
           },
           "name": {
-            "value": "[parameters('models')[copyIndex()].name]"
+            "value": "[variables('foundryModelPairs')[copyIndex()].model.name]"
           },
           "modelName": {
-            "value": "[parameters('models')[copyIndex()].modelName]"
+            "value": "[variables('foundryModelPairs')[copyIndex()].model.modelName]"
           },
           "modelVersion": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelVersion'), ''))]"
+            "value": "[string(coalesce(tryGet(variables('foundryModelPairs')[copyIndex()].model, 'modelVersion'), ''))]"
           },
           "modelFormat": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelFormat'), 'OpenAI'))]"
+            "value": "[string(coalesce(tryGet(variables('foundryModelPairs')[copyIndex()].model, 'modelFormat'), 'OpenAI'))]"
           },
           "skuName": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'skuName'), 'GlobalStandard'))]"
+            "value": "[string(coalesce(tryGet(variables('foundryModelPairs')[copyIndex()].model, 'skuName'), 'GlobalStandard'))]"
           },
           "skuCapacity": {
-            "value": "[int(coalesce(tryGet(parameters('models')[copyIndex()], 'skuCapacity'), 50))]"
+            "value": "[int(coalesce(tryGet(variables('foundryModelPairs')[copyIndex()].model, 'skuCapacity'), 50))]"
           },
           "raiPolicyName": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'raiPolicyName'), ''))]"
+            "value": "[string(coalesce(tryGet(variables('foundryModelPairs')[copyIndex()].model, 'raiPolicyName'), ''))]"
           }
         },
         "template": {
@@ -1220,8 +1408,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "7243382622604451899"
+              "version": "0.42.1.51946",
+              "templateHash": "5808504932132325214"
             }
           },
           "parameters": {
@@ -1328,7 +1516,7 @@
         }
       },
       "dependsOn": [
-        "foundryProject"
+        "[format('foundryProjects[{0}]', variables('foundryModelPairs')[copyIndex()].foundryIndex)]"
       ]
     },
     "uamiRoleAssignments": {
@@ -1338,7 +1526,7 @@
       },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-uami-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "name": "[take(format('{0}-foundry-{1}-uami-role-{2}-deployment', parameters('name'), variables('uamiRolePairs')[copyIndex()].foundryIndex, copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1347,7 +1535,7 @@
         "mode": "Incremental",
         "parameters": {
           "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('effectiveFoundries')[variables('uamiRolePairs')[copyIndex()].foundryIndex].name]"
           },
           "principalId": {
             "value": "[reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId]"
@@ -1356,7 +1544,7 @@
             "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference(format('foundryAccounts[{0}]', variables('uamiRolePairs')[copyIndex()].foundryIndex)).outputs.id.value, reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "principalType": {
             "value": "ServicePrincipal"
@@ -1368,8 +1556,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "15218140288436670077"
+              "version": "0.42.1.51946",
+              "templateHash": "17805555448297308216"
             }
           },
           "parameters": {
@@ -1452,7 +1640,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount",
+        "[format('foundryAccounts[{0}]', variables('uamiRolePairs')[copyIndex()].foundryIndex)]",
         "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]",
         "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]"
       ]
@@ -1464,7 +1652,7 @@
       },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-sp-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "name": "[take(format('{0}-foundry-{1}-sp-role-{2}-deployment', parameters('name'), variables('servicePrincipalRolePairs')[copyIndex()].foundryIndex, copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1473,7 +1661,7 @@
         "mode": "Incremental",
         "parameters": {
           "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('effectiveFoundries')[variables('servicePrincipalRolePairs')[copyIndex()].foundryIndex].name]"
           },
           "principalId": {
             "value": "[variables('servicePrincipalRolePairs')[copyIndex()].principalId]"
@@ -1482,7 +1670,7 @@
             "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference(format('foundryAccounts[{0}]', variables('servicePrincipalRolePairs')[copyIndex()].foundryIndex)).outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "principalType": {
             "value": "ServicePrincipal"
@@ -1494,8 +1682,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "15218140288436670077"
+              "version": "0.42.1.51946",
+              "templateHash": "17805555448297308216"
             }
           },
           "parameters": {
@@ -1578,7 +1766,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount"
+        "[format('foundryAccounts[{0}]', variables('servicePrincipalRolePairs')[copyIndex()].foundryIndex)]"
       ]
     },
     "userRoleAssignments": {
@@ -1588,7 +1776,7 @@
       },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-user-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "name": "[take(format('{0}-foundry-{1}-user-role-{2}-deployment', parameters('name'), variables('userRolePairs')[copyIndex()].foundryIndex, copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1597,7 +1785,7 @@
         "mode": "Incremental",
         "parameters": {
           "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('effectiveFoundries')[variables('userRolePairs')[copyIndex()].foundryIndex].name]"
           },
           "principalId": {
             "value": "[variables('userRolePairs')[copyIndex()].principalId]"
@@ -1606,7 +1794,7 @@
             "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference(format('foundryAccounts[{0}]', variables('userRolePairs')[copyIndex()].foundryIndex)).outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "principalType": {
             "value": "User"
@@ -1618,8 +1806,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "15218140288436670077"
+              "version": "0.42.1.51946",
+              "templateHash": "17805555448297308216"
             }
           },
           "parameters": {
@@ -1702,7 +1890,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount"
+        "[format('foundryAccounts[{0}]', variables('userRolePairs')[copyIndex()].foundryIndex)]"
       ]
     },
     "postgresServer": {
@@ -1758,8 +1946,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "11018863908357162830"
+              "version": "0.42.1.51946",
+              "templateHash": "12362911082645376857"
             }
           },
           "parameters": {
@@ -2038,8 +2226,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "12549242387600695814"
+              "version": "0.42.1.51946",
+              "templateHash": "5247795374404343839"
             }
           },
           "parameters": {
@@ -2169,49 +2357,82 @@
       },
       "value": "[reference('resourceGroup').outputs.location.value]"
     },
-    "foundryAccountId": {
-      "type": "string",
-      "metadata": {
-        "description": "The resource ID of the created Azure AI Foundry account"
+    "foundryAccountIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
       },
-      "value": "[reference('foundryAccount').outputs.id.value]"
+      "metadata": {
+        "description": "The resource IDs of created Azure AI Foundry accounts"
+      },
+      "copy": {
+        "count": "[length(range(0, length(variables('effectiveFoundries'))))]",
+        "input": "[reference(format('foundryAccounts[{0}]', range(0, length(variables('effectiveFoundries')))[copyIndex()])).outputs.id.value]"
+      }
     },
-    "foundryAccountName": {
-      "type": "string",
-      "metadata": {
-        "description": "The name of the created Azure AI Foundry account"
+    "foundryAccountNames": {
+      "type": "array",
+      "items": {
+        "type": "string"
       },
-      "value": "[reference('foundryAccount').outputs.name.value]"
+      "metadata": {
+        "description": "The names of created Azure AI Foundry accounts"
+      },
+      "copy": {
+        "count": "[length(range(0, length(variables('effectiveFoundries'))))]",
+        "input": "[reference(format('foundryAccounts[{0}]', range(0, length(variables('effectiveFoundries')))[copyIndex()])).outputs.name.value]"
+      }
     },
-    "foundryEndpoint": {
-      "type": "string",
-      "metadata": {
-        "description": "The endpoint of the created Azure AI Foundry account"
+    "foundryEndpoints": {
+      "type": "array",
+      "items": {
+        "type": "string"
       },
-      "value": "[reference('foundryAccount').outputs.endpoint.value]"
+      "metadata": {
+        "description": "The endpoints of created Azure AI Foundry accounts"
+      },
+      "copy": {
+        "count": "[length(range(0, length(variables('effectiveFoundries'))))]",
+        "input": "[reference(format('foundryAccounts[{0}]', range(0, length(variables('effectiveFoundries')))[copyIndex()])).outputs.endpoint.value]"
+      }
     },
-    "foundryProjectId": {
-      "type": "string",
-      "metadata": {
-        "description": "The resource ID of the created Azure AI Foundry project"
+    "foundryProjectIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
       },
-      "value": "[reference('foundryProject').outputs.id.value]"
+      "metadata": {
+        "description": "The resource IDs of created Azure AI Foundry projects"
+      },
+      "copy": {
+        "count": "[length(range(0, length(variables('effectiveFoundries'))))]",
+        "input": "[reference(format('foundryProjects[{0}]', range(0, length(variables('effectiveFoundries')))[copyIndex()])).outputs.id.value]"
+      }
     },
-    "foundryProjectName": {
-      "type": "string",
-      "metadata": {
-        "description": "The name of the created Azure AI Foundry project"
+    "foundryProjectNames": {
+      "type": "array",
+      "items": {
+        "type": "string"
       },
-      "value": "[reference('foundryProject').outputs.name.value]"
+      "metadata": {
+        "description": "The names of created Azure AI Foundry projects"
+      },
+      "copy": {
+        "count": "[length(range(0, length(variables('effectiveFoundries'))))]",
+        "input": "[reference(format('foundryProjects[{0}]', range(0, length(variables('effectiveFoundries')))[copyIndex()])).outputs.name.value]"
+      }
     },
     "deployedModelNames": {
       "type": "array",
       "metadata": {
-        "description": "The names of model deployments requested by this scenario"
+        "description": "Model deployment names grouped by Foundry account"
       },
       "copy": {
-        "count": "[length(parameters('models'))]",
-        "input": "[parameters('models')[copyIndex()].name]"
+        "count": "[length(variables('effectiveFoundries'))]",
+        "input": {
+          "foundryAccountName": "[variables('effectiveFoundries')[copyIndex()].name]",
+          "models": "[map(filter(variables('foundryModelPairs'), lambda('pair', equals(lambdaVariables('pair').foundryIndex, copyIndex()))), lambda('pair', lambdaVariables('pair').model.name))]"
+        }
       }
     },
     "logAnalyticsWorkspaceId": {
