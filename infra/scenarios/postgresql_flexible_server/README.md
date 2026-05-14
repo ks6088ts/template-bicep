@@ -8,6 +8,50 @@ ms.date: 2026-05-13
 
 A Bicep scenario that provisions an Azure Database for PostgreSQL Flexible Server (`Microsoft.DBforPostgreSQL/flexibleServers`) with Microsoft Entra ID-only authentication (password authentication disabled), an optional pgvector extension for vector similarity search, configurable firewall rules, initial databases, and optionally Azure Monitor-based observability (Log Analytics workspace and diagnostic settings).
 
+## Deprecation Notice
+
+This scenario is **deprecated** in favor of the consolidated [`concierge` scenario](../concierge/README.md), which provisions Azure AI Foundry + Application Insights tracing + PostgreSQL pgvector behind independent feature flags. This directory remains for backward compatibility and will be removed in a future PR.
+
+### Migration to `concierge`
+
+To provision the equivalent PostgreSQL stack:
+
+```bash
+make deploy SCENARIO=concierge
+```
+
+Set `enablePostgresql = true` (default) and choose whether to enable observability via `enableApplicationInsights`.
+
+**Parameter mapping**
+
+| This scenario (`postgresql_flexible_server`) | `concierge` |
+| --- | --- |
+| `name` | `name` |
+| `location` | `location` |
+| `tags` | `tags` |
+| `entraAdministrator` | `entraAdministrator` |
+| `version` | `postgresVersion` |
+| `skuName` | `postgresSkuName` |
+| `skuTier` | `postgresSkuTier` |
+| `storageSizeGB` | `postgresStorageSizeGB` |
+| `enablePgvector` | `enablePgvector` |
+| `firewallRules` | `firewallRules` |
+| `databases` | `databases` |
+| `enableObservability` | `enableApplicationInsights` |
+
+**Output mapping**
+
+| This scenario (`postgresql_flexible_server`) | `concierge` |
+| --- | --- |
+| `resourceGroupId` | `resourceGroupId` |
+| `resourceGroupName` | `resourceGroupName` |
+| `resourceGroupLocation` | `resourceGroupLocation` |
+| `postgresServerId` | `postgresServerId` *(requires `enablePostgresql = true`)* |
+| `postgresServerName` | `postgresServerName` *(requires `enablePostgresql = true`)* |
+| `postgresServerFqdn` | `postgresServerFqdn` *(requires `enablePostgresql = true`)* |
+| `databaseNames` | `databaseNames` *(requires `enablePostgresql = true`)* |
+| `logAnalyticsWorkspaceId` | `logAnalyticsWorkspaceId` *(requires `enableApplicationInsights = true`)* |
+
 By default this scenario provisions a managed environment equivalent to the [`pgvector/pgvector:pg18`](https://hub.docker.com/r/pgvector/pgvector) Docker image: PostgreSQL major version `18` with the `pgvector` extension allow-listed (`azure.extensions = VECTOR`) so it can be enabled with `CREATE EXTENSION vector;` against any database created on the server.
 
 ## Overview

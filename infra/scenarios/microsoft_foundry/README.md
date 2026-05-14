@@ -8,6 +8,55 @@ ms.date: 2026-05-11
 
 A Bicep scenario that provisions an Azure AI Foundry account (`Microsoft.CognitiveServices/accounts`), a Foundry project, model deployments, and (optionally) scope-limited role assignments for any number of existing User Assigned Managed Identities (UAMI), Microsoft Entra service principals, and Microsoft Entra users. It can also opt in Azure Monitor based observability (Log Analytics, Application Insights, diagnostic settings, and Foundry project tracing connection).
 
+## Deprecation Notice
+
+This scenario is **deprecated** in favor of the consolidated [`concierge` scenario](../concierge/README.md), which composes Foundry + Application Insights tracing + PostgreSQL pgvector behind independent feature flags. This directory remains for backward compatibility and will be removed in a future PR.
+
+### Migration to `concierge`
+
+To provision the equivalent Foundry-only stack with optional observability:
+
+```bash
+make deploy SCENARIO=concierge
+```
+
+Set `enablePostgresql = false` in `infra/scenarios/concierge/main.bicepparam` when you only need Foundry resources.
+
+**Parameter mapping**
+
+| This scenario (`microsoft_foundry`) | `concierge` |
+| --- | --- |
+| `name` | `name` |
+| `location` | `location` |
+| `tags` | `tags` |
+| `disableLocalAuth` | `disableLocalAuth` |
+| `enableObservability` | `enableApplicationInsights` |
+| `models` | `models` |
+| `roleDefinitionIds` | `roleDefinitionIds` |
+| `existingUserAssignedIdentities` | `existingUserAssignedIdentities` |
+| `existingServicePrincipalObjectIds` | `existingServicePrincipalObjectIds` |
+| `existingUserObjectIds` | `existingUserObjectIds` |
+
+**Output mapping**
+
+| This scenario (`microsoft_foundry`) | `concierge` |
+| --- | --- |
+| `resourceGroupId` | `resourceGroupId` |
+| `resourceGroupName` | `resourceGroupName` |
+| `resourceGroupLocation` | `resourceGroupLocation` |
+| `foundryAccountId` | `foundryAccountId` |
+| `foundryAccountName` | `foundryAccountName` |
+| `foundryEndpoint` | `foundryEndpoint` |
+| `foundryProjectId` | `foundryProjectId` |
+| `foundryProjectName` | `foundryProjectName` |
+| `deployedModelNames` | `deployedModelNames` |
+| `logAnalyticsWorkspaceId` | `logAnalyticsWorkspaceId` *(requires `enableApplicationInsights = true`)* |
+| `applicationInsightsId` | `applicationInsightsId` *(requires `enableApplicationInsights = true`)* |
+| `applicationInsightsConnectionString` | `applicationInsightsConnectionString` *(requires `enableApplicationInsights = true`)* |
+| `uamiRoleAssignmentIds` | `uamiRoleAssignmentIds` |
+| `servicePrincipalRoleAssignmentIds` | `servicePrincipalRoleAssignmentIds` |
+| `userRoleAssignmentIds` | `userRoleAssignmentIds` |
+
 ## Overview
 
 This scenario targets the subscription scope and composes reusable modules:
