@@ -8,3 +8,11 @@ param tags = {
   SecurityControl: 'Ignore'
   CostControl: 'Ignore'
 }
+param userAssignedIdentities = [
+  {
+    name: 'id-userassignedmanagedidentity-app'
+  }
+  {
+    name: 'id-userassignedmanagedidentity-worker'
+  }
+]

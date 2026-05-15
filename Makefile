@@ -13,7 +13,6 @@ TENANT_ID ?= $(shell az account show --query tenantId --output tsv)
 SCENARIO ?= hello_world
 SCENARIO_DIR ?= infra/scenarios/$(SCENARIO)
 SCENARIO_DIR_LIST ?= $(shell find infra/scenarios -maxdepth 1 -mindepth 1 -type d -print)
-RESOURCE_GROUP ?= rg-$(SCENARIO)
 LOCATION ?= japaneast
 DEPLOYMENT_NAME ?= $(SCENARIO)_deployment
 # Number of parallel processes used by xargs (defaults to CPU core count; override with PARALLEL=1 to run sequentially)
@@ -99,12 +98,6 @@ deploy: ## deploy resources
 		--location $(LOCATION) \
 		--template-file $(SCENARIO_DIR)/main.bicep \
 		--parameters $(SCENARIO_DIR)/main.bicepparam
-
-.PHONY: destroy
-destroy: ## destroy resources (delete resource group)
-	az group delete \
-		--name $(RESOURCE_GROUP) \
-		--yes
 
 .PHONY: output
 output: ## show output values
