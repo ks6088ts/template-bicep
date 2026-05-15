@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "1640566020095716228"
+      "templateHash": "1229862667864746753"
     }
   },
   "definitions": {
@@ -334,7 +334,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "18281413229281920123"
+              "templateHash": "2000551417832587804"
             }
           },
           "parameters": {
@@ -390,7 +390,7 @@
           "resources": [
             {
               "type": "Microsoft.CognitiveServices/accounts",
-              "apiVersion": "2026-03-01",
+              "apiVersion": "2025-06-01",
               "name": "[parameters('name')]",
               "location": "[parameters('location')]",
               "kind": "AIServices",
@@ -429,14 +429,14 @@
               "metadata": {
                 "description": "The endpoint of the Azure AI Foundry account"
               },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2026-03-01').endpoint]"
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2025-06-01').endpoint]"
             },
             "principalId": {
               "type": "string",
               "metadata": {
                 "description": "The principal ID of the Azure AI Foundry account System Assigned Managed Identity"
               },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2026-03-01', 'full').identity.principalId]"
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2025-06-01', 'full').identity.principalId]"
             }
           }
         }
@@ -479,7 +479,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "14892820478045566648"
+              "templateHash": "11695965732146852268"
             }
           },
           "parameters": {
@@ -533,7 +533,7 @@
           "resources": [
             {
               "type": "Microsoft.CognitiveServices/accounts/projects",
-              "apiVersion": "2025-12-01",
+              "apiVersion": "2025-06-01",
               "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
               "location": "[parameters('location')]",
               "tags": "[parameters('tags')]",
@@ -1107,7 +1107,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "7243382622604451899"
+              "templateHash": "1116477745975917119"
             }
           },
           "parameters": {
@@ -1179,7 +1179,7 @@
           "resources": [
             {
               "type": "Microsoft.CognitiveServices/accounts/deployments",
-              "apiVersion": "2026-03-01",
+              "apiVersion": "2025-06-01",
               "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
               "sku": {
                 "name": "[parameters('skuName')]",
@@ -1208,7 +1208,7 @@
               "metadata": {
                 "description": "The provisioning state of the model deployment"
               },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name')), '2026-03-01').provisioningState]"
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name')), '2025-06-01').provisioningState]"
             }
           }
         }

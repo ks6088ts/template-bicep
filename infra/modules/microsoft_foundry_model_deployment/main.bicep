@@ -41,11 +41,14 @@ param raiPolicyName string = ''
 //    RESOURCES
 // ------------------
 
-resource parentAccount 'Microsoft.CognitiveServices/accounts@2026-03-01' existing = {
+// NOTE: API version pinned to `2025-06-01` to match the parent Foundry account module and the
+// foundry-samples `00-basic` working sample. Mixing API versions across account/project/deployment
+// resources has been observed to cause 500 InternalServerError. See foundry-samples issue #236.
+resource parentAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
   name: parentAccountName
 }
 
-resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2026-03-01' = {
+resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: parentAccount
   name: name
   sku: {

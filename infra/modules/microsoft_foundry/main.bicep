@@ -32,7 +32,12 @@ param disableLocalAuth bool = true
 //    RESOURCES
 // ------------------
 
-resource foundryAccount 'Microsoft.CognitiveServices/accounts@2026-03-01' = {
+// NOTE: Pinned to GA `2025-06-01` (matches the foundry-samples `00-basic` working sample).
+// Newer API versions (e.g. `2025-12-01`, `2026-03-01`) have been observed to create the
+// account in a state where the child project PUT returns persistent 500 InternalServerError,
+// causing the ARM deployment to be cancelled after the retry budget. See foundry-samples
+// issue #236.
+resource foundryAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: name
   location: location
   kind: 'AIServices'

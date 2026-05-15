@@ -31,11 +31,18 @@ param tags object = {}
 //    RESOURCES
 // ------------------
 
-resource parentAccount 'Microsoft.CognitiveServices/accounts@2026-03-01' existing = {
+resource parentAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
   name: parentAccountName
 }
 
-resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-12-01' = {
+// NOTE: Pinned to GA `2025-06-01` (matches the foundry-samples `00-basic` working sample).
+// Newer GA versions (e.g. `2025-12-01`, `2026-03-01`) have been observed returning persistent
+// 500 InternalServerError on project PUT in some regions, causing the ARM deployment to be
+// cancelled after the 8-minute retry budget. The parent account API version must also be
+// pinned to `2025-06-01` (see `modules/microsoft_foundry/main.bicep`); mixing a newer account
+// API version with this project API version reproduces the same 500 error. See foundry-samples
+// issue #236.
+resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
   parent: parentAccount
   name: name
   location: location

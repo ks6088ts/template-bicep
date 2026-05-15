@@ -40,7 +40,8 @@ var roleAssignmentName = empty(roleAssignmentNameSeed)
 //    RESOURCES
 // ------------------
 
-resource targetAccount 'Microsoft.CognitiveServices/accounts@2026-03-01' existing = {
+// NOTE: API version pinned to `2025-06-01` to match the parent Foundry account module.
+resource targetAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
   name: targetAccountName
 }
 
