@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "916242645659768341"
+      "templateHash": "222378873996971655"
     }
   },
   "definitions": {
@@ -42,7 +42,7 @@
         "roleDefinitionGuid": {
           "type": "string",
           "metadata": {
-            "description": "Role definition GUID to grant at Foundry account scope."
+            "description": "Role definition GUID to grant at Storage Account scope."
           }
         }
       },
@@ -62,7 +62,7 @@
         "roleDefinitionGuid": {
           "type": "string",
           "metadata": {
-            "description": "Role definition GUID to grant at Foundry account scope."
+            "description": "Role definition GUID to grant at Storage Account scope."
           }
         }
       },
@@ -83,7 +83,7 @@
     "location": {
       "type": "string",
       "metadata": {
-        "description": "The location for the resource group and Azure AI Foundry resources"
+        "description": "The location for the resource group and Storage Account resources"
       }
     },
     "tags": {
@@ -96,6 +96,114 @@
         "description": "Tags applied to all resources"
       }
     },
+    "skuName": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_GRS",
+        "Standard_RAGRS",
+        "Standard_ZRS",
+        "Standard_GZRS",
+        "Standard_RAGZRS",
+        "Premium_LRS"
+      ],
+      "metadata": {
+        "description": "The SKU name for the Storage Account"
+      }
+    },
+    "kind": {
+      "type": "string",
+      "defaultValue": "StorageV2",
+      "allowedValues": [
+        "StorageV2",
+        "BlockBlobStorage",
+        "FileStorage"
+      ],
+      "metadata": {
+        "description": "The kind for the Storage Account"
+      }
+    },
+    "accessTier": {
+      "type": "string",
+      "defaultValue": "Hot",
+      "allowedValues": [
+        "Hot",
+        "Cool"
+      ],
+      "metadata": {
+        "description": "The access tier for the Storage Account (StorageV2 only)"
+      }
+    },
+    "enableHierarchicalNamespace": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "When true, enables hierarchical namespace (Data Lake Storage Gen2). StorageV2 only."
+      }
+    },
+    "publicNetworkAccess": {
+      "type": "string",
+      "defaultValue": "Enabled",
+      "allowedValues": [
+        "Enabled",
+        "Disabled"
+      ],
+      "metadata": {
+        "description": "Public network access setting"
+      }
+    },
+    "allowSharedKeyAccess": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "When true, allows Shared Key (account key / SAS) authorization. Defaults to false for Entra ID-only access."
+      }
+    },
+    "blobContainers": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "default"
+        }
+      ],
+      "metadata": {
+        "description": "Blob containers to create. Each element: { name: string, publicAccess?: None|Blob|Container }"
+      }
+    },
+    "queues": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "default"
+        }
+      ],
+      "metadata": {
+        "description": "Queues to create. Each element: { name: string, metadata?: object }"
+      }
+    },
+    "tables": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "default"
+        }
+      ],
+      "metadata": {
+        "description": "Tables to create. Each element: { name: string }"
+      }
+    },
+    "fileShares": {
+      "type": "array",
+      "defaultValue": [
+        {
+          "name": "default"
+        }
+      ],
+      "metadata": {
+        "description": "File shares to create. Each element: { name: string, shareQuota?: int, accessTier?: TransactionOptimized|Hot|Cool }"
+      }
+    },
     "existingUserAssignedIdentities": {
       "type": "array",
       "items": {
@@ -103,7 +211,7 @@
       },
       "defaultValue": [],
       "metadata": {
-        "description": "Optional. Array of existing User Assigned Managed Identities (UAMI) to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no UAMI is attached."
+        "description": "Optional. Array of existing User Assigned Managed Identities (UAMI) to grant storage data permissions. Defaults to an empty array, in which case no UAMI is granted."
       }
     },
     "existingServicePrincipalObjectIds": {
@@ -113,7 +221,7 @@
       },
       "defaultValue": [],
       "metadata": {
-        "description": "Optional. Array of object (principal) IDs of existing Microsoft Entra service principals to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no service principal is attached."
+        "description": "Optional. Array of object (principal) IDs of existing Microsoft Entra service principals to grant storage data permissions. Defaults to an empty array."
       }
     },
     "existingUserObjectIds": {
@@ -123,58 +231,7 @@
       },
       "defaultValue": [],
       "metadata": {
-        "description": "Optional. Array of object IDs of existing Microsoft Entra users to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no user is attached."
-      }
-    },
-    "disableLocalAuth": {
-      "type": "bool",
-      "defaultValue": true,
-      "metadata": {
-        "description": "Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication."
-      }
-    },
-    "enableObservability": {
-      "type": "bool",
-      "defaultValue": false,
-      "metadata": {
-        "description": "Enable Azure Monitor based observability resources (Log Analytics, Application Insights, diagnostic settings, and Foundry project tracing connection)."
-      }
-    },
-    "models": {
-      "type": "array",
-      "defaultValue": [
-        {
-          "name": "gpt-4o",
-          "modelName": "gpt-4o",
-          "modelFormat": "OpenAI",
-          "skuName": "GlobalStandard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "gpt-5",
-          "modelName": "gpt-5",
-          "modelVersion": "2025-08-07",
-          "modelFormat": "OpenAI",
-          "skuName": "GlobalStandard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "text-embedding-3-large",
-          "modelName": "text-embedding-3-large",
-          "modelFormat": "OpenAI",
-          "skuName": "Standard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "text-embedding-3-small",
-          "modelName": "text-embedding-3-small",
-          "modelFormat": "OpenAI",
-          "skuName": "Standard",
-          "skuCapacity": 50
-        }
-      ],
-      "metadata": {
-        "description": "The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs."
+        "description": "Optional. Array of object IDs of existing Microsoft Entra users to grant storage data permissions. Defaults to an empty array."
       }
     },
     "roleDefinitionIds": {
@@ -183,21 +240,28 @@
         "type": "string"
       },
       "defaultValue": [
-        "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+        "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+        "974c5e8b-45b9-4653-ba55-5f855dd0fb88",
+        "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3",
+        "69566ab7-960f-475b-8e7c-b3118f30c6bd"
       ],
       "metadata": {
-        "description": "Role definition GUIDs assigned to every existing UAMI, service principal, and user at Azure AI Foundry account scope."
+        "description": "Role definition GUIDs assigned to every existing UAMI, service principal, and user at Storage Account scope."
+      }
+    },
+    "enableObservability": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Enable Azure Monitor based observability resources (Log Analytics workspace and diagnostic settings)."
       }
     }
   },
   "variables": {
     "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
-    "foundryAccountName": "[take(toLower(replace(format('aif-{0}', parameters('name')), '_', '-')), 59)]",
-    "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]",
+    "storageAccountName": "[take(toLower(replace(replace(format('st{0}', parameters('name')), '_', ''), '-', '')), 24)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
-    "applicationInsightsName": "[take(toLower(replace(format('appi-{0}', parameters('name')), '_', '-')), 260)]",
-    "foundryDiagnosticSettingsName": "[take(format('diag-{0}', variables('foundryAccountName')), 64)]",
-    "foundryAppInsightsConnectionName": "[take(format('appinsights-{0}', variables('foundryProjectName')), 64)]",
+    "storageDiagnosticSettingsName": "[take(format('diag-{0}', variables('storageAccountName')), 64)]",
     "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
     "servicePrincipalRolePairs": "[flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
     "userRolePairs": "[flatten(map(parameters('existingUserObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]"
@@ -303,10 +367,10 @@
         }
       }
     },
-    "foundryAccount": {
+    "storageAccount": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-foundry-account-deployment', parameters('name')), 64)]",
+      "name": "[take(format('{0}-storage-deployment', parameters('name')), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -315,7 +379,7 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('foundryAccountName')]"
+            "value": "[variables('storageAccountName')]"
           },
           "location": {
             "value": "[parameters('location')]"
@@ -323,8 +387,35 @@
           "tags": {
             "value": "[parameters('tags')]"
           },
-          "disableLocalAuth": {
-            "value": "[parameters('disableLocalAuth')]"
+          "skuName": {
+            "value": "[parameters('skuName')]"
+          },
+          "kind": {
+            "value": "[parameters('kind')]"
+          },
+          "accessTier": {
+            "value": "[parameters('accessTier')]"
+          },
+          "enableHierarchicalNamespace": {
+            "value": "[parameters('enableHierarchicalNamespace')]"
+          },
+          "publicNetworkAccess": {
+            "value": "[parameters('publicNetworkAccess')]"
+          },
+          "allowSharedKeyAccess": {
+            "value": "[parameters('allowSharedKeyAccess')]"
+          },
+          "blobContainers": {
+            "value": "[parameters('blobContainers')]"
+          },
+          "queues": {
+            "value": "[parameters('queues')]"
+          },
+          "tables": {
+            "value": "[parameters('tables')]"
+          },
+          "fileShares": {
+            "value": "[parameters('fileShares')]"
           }
         },
         "template": {
@@ -334,38 +425,75 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "2000551417832587804"
+              "templateHash": "3912676843792972109"
             }
           },
           "parameters": {
             "name": {
               "type": "string",
-              "minLength": 2,
-              "maxLength": 59,
+              "minLength": 3,
+              "maxLength": 24,
               "metadata": {
-                "description": "The name of the Azure AI Foundry account"
+                "description": "The name of the Storage Account. Must be 3-24 characters and lowercase alphanumeric."
               }
             },
             "location": {
               "type": "string",
               "metadata": {
-                "description": "The Azure region where the Azure AI Foundry account will be created"
+                "description": "The Azure region where the Storage Account will be created"
               }
             },
             "tags": {
               "type": "object",
               "defaultValue": {},
               "metadata": {
-                "description": "Tags applied to the Azure AI Foundry account"
+                "description": "Tags applied to the Storage Account"
               }
             },
-            "customSubDomainName": {
+            "skuName": {
               "type": "string",
-              "defaultValue": "[parameters('name')]",
-              "minLength": 2,
-              "maxLength": 64,
+              "defaultValue": "Standard_LRS",
+              "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_RAGRS",
+                "Standard_ZRS",
+                "Standard_GZRS",
+                "Standard_RAGZRS",
+                "Premium_LRS"
+              ],
               "metadata": {
-                "description": "The custom subdomain name for the Azure AI Foundry account endpoint"
+                "description": "The SKU name for the Storage Account"
+              }
+            },
+            "kind": {
+              "type": "string",
+              "defaultValue": "StorageV2",
+              "allowedValues": [
+                "StorageV2",
+                "BlockBlobStorage",
+                "FileStorage"
+              ],
+              "metadata": {
+                "description": "The kind for the Storage Account"
+              }
+            },
+            "accessTier": {
+              "type": "string",
+              "defaultValue": "Hot",
+              "allowedValues": [
+                "Hot",
+                "Cool"
+              ],
+              "metadata": {
+                "description": "The access tier for the Storage Account (StorageV2 only)"
+              }
+            },
+            "enableHierarchicalNamespace": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "When true, enables hierarchical namespace (Data Lake Storage Gen2). StorageV2 only."
               }
             },
             "publicNetworkAccess": {
@@ -376,193 +504,375 @@
                 "Disabled"
               ],
               "metadata": {
-                "description": "Controls public network access to the Azure AI Foundry account"
+                "description": "Public network access setting"
               }
             },
-            "disableLocalAuth": {
-              "type": "bool",
-              "defaultValue": true,
+            "minimumTlsVersion": {
+              "type": "string",
+              "defaultValue": "TLS1_2",
+              "allowedValues": [
+                "TLS1_0",
+                "TLS1_1",
+                "TLS1_2"
+              ],
               "metadata": {
-                "description": "Disable local authentication (API keys) and require Entra ID authentication"
+                "description": "The minimum TLS version to enforce"
+              }
+            },
+            "allowSharedKeyAccess": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "When true, allows Shared Key (account key / SAS) authorization. Defaults to false for Entra ID-only access."
+              }
+            },
+            "networkAclsDefaultAction": {
+              "type": "string",
+              "defaultValue": "Allow",
+              "allowedValues": [
+                "Allow",
+                "Deny"
+              ],
+              "metadata": {
+                "description": "Network ACL default action. Defaults to Allow for generic templates; set Deny for locked-down deployments."
+              }
+            },
+            "blobContainers": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "name": "default"
+                }
+              ],
+              "metadata": {
+                "description": "Blob containers to create. Each element: { name: string, publicAccess?: None|Blob|Container }"
+              }
+            },
+            "queues": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "name": "default"
+                }
+              ],
+              "metadata": {
+                "description": "Queues to create. Each element: { name: string, metadata?: object }"
+              }
+            },
+            "tables": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "name": "default"
+                }
+              ],
+              "metadata": {
+                "description": "Tables to create. Each element: { name: string }"
+              }
+            },
+            "fileShares": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "name": "default"
+                }
+              ],
+              "metadata": {
+                "description": "File shares to create. Each element: { name: string, shareQuota?: int, accessTier?: TransactionOptimized|Hot|Cool }"
+              }
+            },
+            "blobSoftDeleteRetentionDays": {
+              "type": "int",
+              "defaultValue": 7,
+              "minValue": 1,
+              "maxValue": 365,
+              "metadata": {
+                "description": "Soft delete retention days for blob soft delete (1-365)"
+              }
+            },
+            "containerSoftDeleteRetentionDays": {
+              "type": "int",
+              "defaultValue": 7,
+              "minValue": 1,
+              "maxValue": 365,
+              "metadata": {
+                "description": "Soft delete retention days for container soft delete (1-365)"
+              }
+            },
+            "enableBlobVersioning": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "When true, enables blob versioning"
+              }
+            },
+            "enableChangeFeed": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "When true, enables change feed on the default blob service"
+              }
+            },
+            "fileShareSoftDeleteRetentionDays": {
+              "type": "int",
+              "defaultValue": 7,
+              "minValue": 1,
+              "maxValue": 365,
+              "metadata": {
+                "description": "Soft delete retention days for file share soft delete (1-365)"
               }
             }
           },
+          "variables": {
+            "copy": [
+              {
+                "name": "requestedBlobContainerNames",
+                "count": "[length(parameters('blobContainers'))]",
+                "input": "[parameters('blobContainers')[copyIndex('requestedBlobContainerNames')].name]"
+              },
+              {
+                "name": "requestedQueueNames",
+                "count": "[length(parameters('queues'))]",
+                "input": "[parameters('queues')[copyIndex('requestedQueueNames')].name]"
+              },
+              {
+                "name": "requestedTableNames",
+                "count": "[length(parameters('tables'))]",
+                "input": "[parameters('tables')[copyIndex('requestedTableNames')].name]"
+              },
+              {
+                "name": "requestedFileShareNames",
+                "count": "[length(parameters('fileShares'))]",
+                "input": "[parameters('fileShares')[copyIndex('requestedFileShareNames')].name]"
+              }
+            ],
+            "supportsBlob": "[or(equals(parameters('kind'), 'StorageV2'), equals(parameters('kind'), 'BlockBlobStorage'))]",
+            "supportsQueueAndTable": "[equals(parameters('kind'), 'StorageV2')]",
+            "supportsFile": "[or(equals(parameters('kind'), 'StorageV2'), equals(parameters('kind'), 'FileStorage'))]",
+            "storageAccountProperties": "[union(createObject('allowSharedKeyAccess', parameters('allowSharedKeyAccess'), 'defaultToOAuthAuthentication', true(), 'allowBlobPublicAccess', false(), 'allowCrossTenantReplication', false(), 'supportsHttpsTrafficOnly', true(), 'minimumTlsVersion', parameters('minimumTlsVersion'), 'publicNetworkAccess', parameters('publicNetworkAccess'), 'networkAcls', createObject('bypass', 'AzureServices', 'defaultAction', parameters('networkAclsDefaultAction'))), if(equals(parameters('kind'), 'StorageV2'), createObject('accessTier', parameters('accessTier'), 'isHnsEnabled', parameters('enableHierarchicalNamespace')), createObject()))]"
+          },
           "resources": [
             {
-              "type": "Microsoft.CognitiveServices/accounts",
-              "apiVersion": "2025-06-01",
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2024-01-01",
               "name": "[parameters('name')]",
               "location": "[parameters('location')]",
-              "kind": "AIServices",
-              "sku": {
-                "name": "S0"
-              },
               "tags": "[parameters('tags')]",
-              "identity": {
-                "type": "SystemAssigned"
+              "sku": {
+                "name": "[parameters('skuName')]"
               },
+              "kind": "[parameters('kind')]",
+              "properties": "[variables('storageAccountProperties')]"
+            },
+            {
+              "condition": "[variables('supportsBlob')]",
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2024-01-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'default')]",
               "properties": {
-                "customSubDomainName": "[parameters('customSubDomainName')]",
-                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
-                "disableLocalAuth": "[parameters('disableLocalAuth')]",
-                "allowProjectManagement": true
-              }
+                "deleteRetentionPolicy": {
+                  "enabled": true,
+                  "days": "[parameters('blobSoftDeleteRetentionDays')]"
+                },
+                "containerDeleteRetentionPolicy": {
+                  "enabled": true,
+                  "days": "[parameters('containerSoftDeleteRetentionDays')]"
+                },
+                "isVersioningEnabled": "[parameters('enableBlobVersioning')]",
+                "changeFeed": {
+                  "enabled": "[parameters('enableChangeFeed')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('name'))]"
+              ]
+            },
+            {
+              "condition": "[variables('supportsQueueAndTable')]",
+              "type": "Microsoft.Storage/storageAccounts/queueServices",
+              "apiVersion": "2024-01-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'default')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('name'))]"
+              ]
+            },
+            {
+              "condition": "[variables('supportsQueueAndTable')]",
+              "type": "Microsoft.Storage/storageAccounts/tableServices",
+              "apiVersion": "2024-01-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'default')]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('name'))]"
+              ]
+            },
+            {
+              "condition": "[variables('supportsFile')]",
+              "type": "Microsoft.Storage/storageAccounts/fileServices",
+              "apiVersion": "2024-01-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'default')]",
+              "properties": {
+                "shareDeleteRetentionPolicy": {
+                  "enabled": true,
+                  "days": "[parameters('fileShareSoftDeleteRetentionDays')]"
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('name'))]"
+              ]
+            },
+            {
+              "copy": {
+                "name": "blobContainerResources",
+                "count": "[length(parameters('blobContainers'))]"
+              },
+              "condition": "[variables('supportsBlob')]",
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2024-01-01",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'default', parameters('blobContainers')[copyIndex()].name)]",
+              "properties": {
+                "publicAccess": "[coalesce(tryGet(parameters('blobContainers')[copyIndex()], 'publicAccess'), 'None')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('name'), 'default')]"
+              ]
+            },
+            {
+              "copy": {
+                "name": "queueResources",
+                "count": "[length(parameters('queues'))]"
+              },
+              "condition": "[variables('supportsQueueAndTable')]",
+              "type": "Microsoft.Storage/storageAccounts/queueServices/queues",
+              "apiVersion": "2024-01-01",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'default', parameters('queues')[copyIndex()].name)]",
+              "properties": {
+                "metadata": "[coalesce(tryGet(parameters('queues')[copyIndex()], 'metadata'), createObject())]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/queueServices', parameters('name'), 'default')]"
+              ]
+            },
+            {
+              "copy": {
+                "name": "tableResources",
+                "count": "[length(parameters('tables'))]"
+              },
+              "condition": "[variables('supportsQueueAndTable')]",
+              "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+              "apiVersion": "2024-01-01",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'default', parameters('tables')[copyIndex()].name)]",
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('name'), 'default')]"
+              ]
+            },
+            {
+              "copy": {
+                "name": "fileShareResources",
+                "count": "[length(parameters('fileShares'))]"
+              },
+              "condition": "[variables('supportsFile')]",
+              "type": "Microsoft.Storage/storageAccounts/fileServices/shares",
+              "apiVersion": "2024-01-01",
+              "name": "[format('{0}/{1}/{2}', parameters('name'), 'default', parameters('fileShares')[copyIndex()].name)]",
+              "properties": {
+                "shareQuota": "[int(coalesce(tryGet(parameters('fileShares')[copyIndex()], 'shareQuota'), 100))]",
+                "accessTier": "[coalesce(tryGet(parameters('fileShares')[copyIndex()], 'accessTier'), 'TransactionOptimized')]"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('name'), 'default')]"
+              ]
             }
           ],
           "outputs": {
             "id": {
               "type": "string",
               "metadata": {
-                "description": "The resource ID of the Azure AI Foundry account"
+                "description": "The resource ID of the Storage Account"
               },
-              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('name'))]"
+              "value": "[resourceId('Microsoft.Storage/storageAccounts', parameters('name'))]"
             },
             "name": {
               "type": "string",
               "metadata": {
-                "description": "The name of the Azure AI Foundry account"
+                "description": "The name of the Storage Account"
               },
               "value": "[parameters('name')]"
             },
-            "endpoint": {
-              "type": "string",
+            "primaryEndpoints": {
+              "type": "object",
               "metadata": {
-                "description": "The endpoint of the Azure AI Foundry account"
+                "description": "The primary endpoints of the Storage Account"
               },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2025-06-01').endpoint]"
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('name')), '2024-01-01').primaryEndpoints]"
             },
-            "principalId": {
+            "blobEndpoint": {
               "type": "string",
               "metadata": {
-                "description": "The principal ID of the Azure AI Foundry account System Assigned Managed Identity"
+                "description": "The blob endpoint (empty when not available)"
               },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2025-06-01', 'full').identity.principalId]"
+              "value": "[coalesce(tryGet(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('name')), '2024-01-01').primaryEndpoints, 'blob'), '')]"
+            },
+            "queueEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "The queue endpoint (empty when not available)"
+              },
+              "value": "[coalesce(tryGet(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('name')), '2024-01-01').primaryEndpoints, 'queue'), '')]"
+            },
+            "tableEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "The table endpoint (empty when not available)"
+              },
+              "value": "[coalesce(tryGet(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('name')), '2024-01-01').primaryEndpoints, 'table'), '')]"
+            },
+            "fileEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "The file endpoint (empty when not available)"
+              },
+              "value": "[coalesce(tryGet(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('name')), '2024-01-01').primaryEndpoints, 'file'), '')]"
+            },
+            "dfsEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "The dfs endpoint (empty when not available)"
+              },
+              "value": "[coalesce(tryGet(reference(resourceId('Microsoft.Storage/storageAccounts', parameters('name')), '2024-01-01').primaryEndpoints, 'dfs'), '')]"
+            },
+            "blobContainerNames": {
+              "type": "array",
+              "metadata": {
+                "description": "The names of blob containers created"
+              },
+              "value": "[if(variables('supportsBlob'), variables('requestedBlobContainerNames'), createArray())]"
+            },
+            "queueNames": {
+              "type": "array",
+              "metadata": {
+                "description": "The names of queues created"
+              },
+              "value": "[if(variables('supportsQueueAndTable'), variables('requestedQueueNames'), createArray())]"
+            },
+            "tableNames": {
+              "type": "array",
+              "metadata": {
+                "description": "The names of tables created"
+              },
+              "value": "[if(variables('supportsQueueAndTable'), variables('requestedTableNames'), createArray())]"
+            },
+            "fileShareNames": {
+              "type": "array",
+              "metadata": {
+                "description": "The names of file shares created"
+              },
+              "value": "[if(variables('supportsFile'), variables('requestedFileShareNames'), createArray())]"
             }
           }
         }
       },
       "dependsOn": [
         "resourceGroup"
-      ]
-    },
-    "foundryProject": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-foundry-project-deployment', parameters('name')), 64)]",
-      "resourceGroup": "[variables('resourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
-          },
-          "name": {
-            "value": "[variables('foundryProjectName')]"
-          },
-          "location": {
-            "value": "[parameters('location')]"
-          },
-          "displayName": {
-            "value": "[variables('foundryProjectName')]"
-          },
-          "tags": {
-            "value": "[parameters('tags')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "11695965732146852268"
-            }
-          },
-          "parameters": {
-            "parentAccountName": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 59,
-              "metadata": {
-                "description": "The name of the parent Azure AI Foundry account"
-              }
-            },
-            "name": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The name of the Azure AI Foundry project"
-              }
-            },
-            "location": {
-              "type": "string",
-              "metadata": {
-                "description": "The Azure region where the Azure AI Foundry project will be created"
-              }
-            },
-            "displayName": {
-              "type": "string",
-              "defaultValue": "[parameters('name')]",
-              "minLength": 2,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The display name of the Azure AI Foundry project"
-              }
-            },
-            "projectDescription": {
-              "type": "string",
-              "defaultValue": "",
-              "maxLength": 1024,
-              "metadata": {
-                "description": "The description of the Azure AI Foundry project"
-              }
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {},
-              "metadata": {
-                "description": "Tags applied to the Azure AI Foundry project"
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.CognitiveServices/accounts/projects",
-              "apiVersion": "2025-06-01",
-              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "identity": {
-                "type": "SystemAssigned"
-              },
-              "properties": "[shallowMerge(createArray(createObject('displayName', parameters('displayName')), if(empty(parameters('projectDescription')), createObject(), createObject('description', parameters('projectDescription')))))]"
-            }
-          ],
-          "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the Azure AI Foundry project"
-              },
-              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('parentAccountName'), parameters('name'))]"
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the Azure AI Foundry project"
-              },
-              "value": "[parameters('name')]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "foundryAccount"
       ]
     },
     "logAnalyticsWorkspace": {
@@ -666,115 +976,7 @@
         "resourceGroup"
       ]
     },
-    "applicationInsights": {
-      "condition": "[parameters('enableObservability')]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-appi-deployment', parameters('name')), 64)]",
-      "resourceGroup": "[variables('resourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "name": {
-            "value": "[variables('applicationInsightsName')]"
-          },
-          "location": {
-            "value": "[parameters('location')]"
-          },
-          "workspaceResourceId": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
-          },
-          "tags": {
-            "value": "[parameters('tags')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "14177430626936703635"
-            }
-          },
-          "parameters": {
-            "name": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 260,
-              "metadata": {
-                "description": "The name of the Application Insights component"
-              }
-            },
-            "location": {
-              "type": "string",
-              "metadata": {
-                "description": "The Azure region where the Application Insights component will be created"
-              }
-            },
-            "workspaceResourceId": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The resource ID of the Log Analytics workspace used for workspace-based ingestion"
-              }
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {},
-              "metadata": {
-                "description": "Tags applied to the Application Insights component"
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.Insights/components",
-              "apiVersion": "2020-02-02",
-              "name": "[parameters('name')]",
-              "location": "[parameters('location')]",
-              "kind": "web",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "Application_Type": "web",
-                "WorkspaceResourceId": "[parameters('workspaceResourceId')]"
-              }
-            }
-          ],
-          "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the Application Insights component"
-              },
-              "value": "[resourceId('Microsoft.Insights/components', parameters('name'))]"
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the Application Insights component"
-              },
-              "value": "[parameters('name')]"
-            },
-            "connectionString": {
-              "type": "string",
-              "metadata": {
-                "description": "The connection string of the Application Insights component"
-              },
-              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('name')), '2020-02-02').ConnectionString]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "logAnalyticsWorkspace"
-      ]
-    },
-    "foundryDiagnosticSettings": {
+    "storageDiagnosticSettings": {
       "condition": "[parameters('enableObservability')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
@@ -787,13 +989,13 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('foundryDiagnosticSettingsName')]"
+            "value": "[variables('storageDiagnosticSettingsName')]"
           },
           "workspaceResourceId": {
             "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
           },
-          "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+          "targetStorageAccountName": {
+            "value": "[variables('storageAccountName')]"
           }
         },
         "template": {
@@ -980,315 +1182,8 @@
         }
       },
       "dependsOn": [
-        "foundryAccount",
-        "logAnalyticsWorkspace"
-      ]
-    },
-    "foundryAppInsightsConnection": {
-      "condition": "[parameters('enableObservability')]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-appinsights-connection-deployment', parameters('name')), 64)]",
-      "resourceGroup": "[variables('resourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
-          },
-          "name": {
-            "value": "[variables('foundryAppInsightsConnectionName')]"
-          },
-          "parentProjectName": {
-            "value": "[variables('foundryProjectName')]"
-          },
-          "category": {
-            "value": "AppInsights"
-          },
-          "target": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
-          },
-          "credentialKey": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'connectionString', 'value'), '')]"
-          },
-          "resourceId": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
-          },
-          "location": {
-            "value": "[parameters('location')]"
-          },
-          "isSharedToAll": {
-            "value": false
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "14748774820262903127"
-            }
-          },
-          "parameters": {
-            "parentAccountName": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 59,
-              "metadata": {
-                "description": "The name of the parent Azure AI Foundry account"
-              }
-            },
-            "parentProjectName": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The name of the parent Azure AI Foundry project"
-              }
-            },
-            "name": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The name of the connection resource"
-              }
-            },
-            "category": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The connection category for the Foundry project"
-              }
-            },
-            "target": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The target endpoint or resource ID for the connection"
-              }
-            },
-            "credentialKey": {
-              "type": "securestring",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional credential key used for ApiKey-based connections"
-              }
-            },
-            "location": {
-              "type": "string",
-              "metadata": {
-                "description": "The Azure region of the connected resource"
-              }
-            },
-            "resourceId": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The Azure resource ID of the connected resource"
-              }
-            },
-            "isSharedToAll": {
-              "type": "bool",
-              "defaultValue": false,
-              "metadata": {
-                "description": "Whether the connection is shared to all resources in the project"
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.CognitiveServices/accounts/projects/connections",
-              "apiVersion": "2025-12-01",
-              "name": "[format('{0}/{1}/{2}', parameters('parentAccountName'), parameters('parentProjectName'), parameters('name'))]",
-              "properties": "[shallowMerge(createArray(createObject('authType', 'ApiKey', 'category', parameters('category'), 'target', parameters('target')), if(empty(parameters('credentialKey')), createObject(), createObject('credentials', createObject('key', parameters('credentialKey')))), createObject('isSharedToAll', parameters('isSharedToAll'), 'metadata', createObject('ApiType', 'Azure', 'ResourceId', parameters('resourceId'), 'location', parameters('location')))))]"
-            }
-          ],
-          "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the Foundry project connection"
-              },
-              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects/connections', parameters('parentAccountName'), parameters('parentProjectName'), parameters('name'))]"
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the Foundry project connection"
-              },
-              "value": "[parameters('name')]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "applicationInsights",
-        "foundryProject"
-      ]
-    },
-    "modelDeployments": {
-      "copy": {
-        "name": "modelDeployments",
-        "count": "[length(parameters('models'))]",
-        "mode": "serial",
-        "batchSize": 1
-      },
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-model-{1}-deployment', parameters('name'), copyIndex()), 64)]",
-      "resourceGroup": "[variables('resourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
-          },
-          "name": {
-            "value": "[parameters('models')[copyIndex()].name]"
-          },
-          "modelName": {
-            "value": "[parameters('models')[copyIndex()].modelName]"
-          },
-          "modelVersion": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelVersion'), ''))]"
-          },
-          "modelFormat": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelFormat'), 'OpenAI'))]"
-          },
-          "skuName": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'skuName'), 'GlobalStandard'))]"
-          },
-          "skuCapacity": {
-            "value": "[int(coalesce(tryGet(parameters('models')[copyIndex()], 'skuCapacity'), 50))]"
-          },
-          "raiPolicyName": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'raiPolicyName'), ''))]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "1116477745975917119"
-            }
-          },
-          "parameters": {
-            "parentAccountName": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 59,
-              "metadata": {
-                "description": "The name of the parent Azure AI Foundry account"
-              }
-            },
-            "name": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The name of the model deployment"
-              }
-            },
-            "modelName": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128,
-              "metadata": {
-                "description": "The model name to deploy"
-              }
-            },
-            "modelVersion": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "The model version to deploy (optional)"
-              }
-            },
-            "modelFormat": {
-              "type": "string",
-              "defaultValue": "OpenAI",
-              "minLength": 1,
-              "maxLength": 32,
-              "metadata": {
-                "description": "The model format to deploy"
-              }
-            },
-            "skuName": {
-              "type": "string",
-              "defaultValue": "GlobalStandard",
-              "minLength": 1,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The SKU name for the model deployment"
-              }
-            },
-            "skuCapacity": {
-              "type": "int",
-              "defaultValue": 50,
-              "minValue": 1,
-              "metadata": {
-                "description": "The SKU capacity for the model deployment"
-              }
-            },
-            "raiPolicyName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "The Responsible AI policy name (optional)"
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.CognitiveServices/accounts/deployments",
-              "apiVersion": "2025-06-01",
-              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
-              "sku": {
-                "name": "[parameters('skuName')]",
-                "capacity": "[parameters('skuCapacity')]"
-              },
-              "properties": "[shallowMerge(createArray(createObject('model', shallowMerge(createArray(createObject('format', parameters('modelFormat'), 'name', parameters('modelName')), if(empty(parameters('modelVersion')), createObject(), createObject('version', parameters('modelVersion')))))), if(empty(parameters('raiPolicyName')), createObject(), createObject('raiPolicyName', parameters('raiPolicyName')))))]"
-            }
-          ],
-          "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the model deployment"
-              },
-              "value": "[resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name'))]"
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the model deployment"
-              },
-              "value": "[parameters('name')]"
-            },
-            "provisioningState": {
-              "type": "string",
-              "metadata": {
-                "description": "The provisioning state of the model deployment"
-              },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name')), '2025-06-01').provisioningState]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "foundryProject"
+        "logAnalyticsWorkspace",
+        "storageAccount"
       ]
     },
     "uamiRoleAssignments": {
@@ -1306,8 +1201,8 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+          "targetStorageAccountName": {
+            "value": "[variables('storageAccountName')]"
           },
           "principalId": {
             "value": "[reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId]"
@@ -1316,7 +1211,7 @@
             "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference('storageAccount').outputs.id.value, reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "principalType": {
             "value": "ServicePrincipal"
@@ -1437,7 +1332,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount",
+        "storageAccount",
         "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]",
         "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]"
       ]
@@ -1457,8 +1352,8 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+          "targetStorageAccountName": {
+            "value": "[variables('storageAccountName')]"
           },
           "principalId": {
             "value": "[variables('servicePrincipalRolePairs')[copyIndex()].principalId]"
@@ -1467,7 +1362,7 @@
             "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference('storageAccount').outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "principalType": {
             "value": "ServicePrincipal"
@@ -1588,7 +1483,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount"
+        "storageAccount"
       ]
     },
     "userRoleAssignments": {
@@ -1606,8 +1501,8 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+          "targetStorageAccountName": {
+            "value": "[variables('storageAccountName')]"
           },
           "principalId": {
             "value": "[variables('userRolePairs')[copyIndex()].principalId]"
@@ -1616,7 +1511,7 @@
             "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference('storageAccount').outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "principalType": {
             "value": "User"
@@ -1737,7 +1632,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount"
+        "storageAccount"
       ]
     }
   },
@@ -1763,50 +1658,82 @@
       },
       "value": "[reference('resourceGroup').outputs.location.value]"
     },
-    "foundryAccountId": {
+    "storageAccountId": {
       "type": "string",
       "metadata": {
-        "description": "The resource ID of the created Azure AI Foundry account"
+        "description": "The resource ID of the created Storage Account"
       },
-      "value": "[reference('foundryAccount').outputs.id.value]"
+      "value": "[reference('storageAccount').outputs.id.value]"
     },
-    "foundryAccountName": {
+    "storageAccountName": {
       "type": "string",
       "metadata": {
-        "description": "The name of the created Azure AI Foundry account"
+        "description": "The name of the created Storage Account"
       },
-      "value": "[reference('foundryAccount').outputs.name.value]"
+      "value": "[reference('storageAccount').outputs.name.value]"
     },
-    "foundryEndpoint": {
+    "blobEndpoint": {
       "type": "string",
       "metadata": {
-        "description": "The endpoint of the created Azure AI Foundry account"
+        "description": "The blob endpoint of the created Storage Account"
       },
-      "value": "[reference('foundryAccount').outputs.endpoint.value]"
+      "value": "[reference('storageAccount').outputs.blobEndpoint.value]"
     },
-    "foundryProjectId": {
+    "queueEndpoint": {
       "type": "string",
       "metadata": {
-        "description": "The resource ID of the created Azure AI Foundry project"
+        "description": "The queue endpoint of the created Storage Account"
       },
-      "value": "[reference('foundryProject').outputs.id.value]"
+      "value": "[reference('storageAccount').outputs.queueEndpoint.value]"
     },
-    "foundryProjectName": {
+    "tableEndpoint": {
       "type": "string",
       "metadata": {
-        "description": "The name of the created Azure AI Foundry project"
+        "description": "The table endpoint of the created Storage Account"
       },
-      "value": "[reference('foundryProject').outputs.name.value]"
+      "value": "[reference('storageAccount').outputs.tableEndpoint.value]"
     },
-    "deployedModelNames": {
+    "fileEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "The file endpoint of the created Storage Account"
+      },
+      "value": "[reference('storageAccount').outputs.fileEndpoint.value]"
+    },
+    "dfsEndpoint": {
+      "type": "string",
+      "metadata": {
+        "description": "The dfs endpoint of the created Storage Account"
+      },
+      "value": "[reference('storageAccount').outputs.dfsEndpoint.value]"
+    },
+    "blobContainerNames": {
       "type": "array",
       "metadata": {
-        "description": "The names of model deployments requested by this scenario"
+        "description": "The names of blob containers created"
       },
-      "copy": {
-        "count": "[length(parameters('models'))]",
-        "input": "[parameters('models')[copyIndex()].name]"
-      }
+      "value": "[reference('storageAccount').outputs.blobContainerNames.value]"
+    },
+    "queueNames": {
+      "type": "array",
+      "metadata": {
+        "description": "The names of queues created"
+      },
+      "value": "[reference('storageAccount').outputs.queueNames.value]"
+    },
+    "tableNames": {
+      "type": "array",
+      "metadata": {
+        "description": "The names of tables created"
+      },
+      "value": "[reference('storageAccount').outputs.tableNames.value]"
+    },
+    "fileShareNames": {
+      "type": "array",
+      "metadata": {
+        "description": "The names of file shares created"
+      },
+      "value": "[reference('storageAccount').outputs.fileShareNames.value]"
     },
     "logAnalyticsWorkspaceId": {
       "type": "string",
@@ -1814,20 +1741,6 @@
         "description": "The resource ID of the created Log Analytics workspace (empty when observability is disabled)"
       },
       "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
-    },
-    "applicationInsightsId": {
-      "type": "string",
-      "metadata": {
-        "description": "The resource ID of the created Application Insights component (empty when observability is disabled)"
-      },
-      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
-    },
-    "applicationInsightsConnectionString": {
-      "type": "string",
-      "metadata": {
-        "description": "The connection string of the created Application Insights component (empty when observability is disabled)"
-      },
-      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'connectionString', 'value'), '')]"
     },
     "uamiRoleAssignmentIds": {
       "type": "array",
