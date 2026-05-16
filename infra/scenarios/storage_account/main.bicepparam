@@ -1,8 +1,6 @@
 using 'main.bicep'
 
-// 'tplbicepstg' is used to stay within the 24-character limit for the derived
-// storage account name 'st${name}' and avoid hyphens/underscores in the base name.
-param name = 'tplbicepstg'
+param name = 'templatebicepstorage'
 param location = 'japaneast'
 param tags = {
   environment: 'dev'
@@ -44,4 +42,3 @@ param tags = {
 
 // Optional: enable observability resources (Log Analytics workspace and diagnostic settings).
 // param enableObservability = true
-
