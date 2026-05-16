@@ -118,6 +118,15 @@ param enableChangeFeed bool = false
 param fileShareSoftDeleteRetentionDays int = 7
 
 // ------------------
+//    VARIABLES
+// ------------------
+
+var blobContainerNamesArray = [for (container, i) in blobContainers: containers[i].name]
+var queueNamesArray = [for (queue, i) in queues: queuesResource[i].name]
+var tableNamesArray = [for (table, i) in tables: tablesResource[i].name]
+var fileShareNamesArray = [for (share, i) in fileShares: fileSharesResource[i].name]
+
+// ------------------
 //    RESOURCES
 // ------------------
 
@@ -264,13 +273,13 @@ output fileEndpoint string = storageAccount.properties.primaryEndpoints.?file ??
 output dfsEndpoint string = storageAccount.properties.primaryEndpoints.?dfs ?? ''
 
 @description('The names of created blob containers')
-output blobContainerNames array = [for (container, i) in blobContainers: containers[i].name]
+output blobContainerNames array = (kind == 'StorageV2' || kind == 'BlockBlobStorage') ? blobContainerNamesArray : []
 
 @description('The names of created queues')
-output queueNames array = [for (queue, i) in queues: queuesResource[i].name]
+output queueNames array = kind == 'StorageV2' ? queueNamesArray : []
 
 @description('The names of created tables')
-output tableNames array = [for (table, i) in tables: tablesResource[i].name]
+output tableNames array = kind == 'StorageV2' ? tableNamesArray : []
 
 @description('The names of created file shares')
-output fileShareNames array = [for (share, i) in fileShares: fileSharesResource[i].name]
+output fileShareNames array = (kind == 'StorageV2' || kind == 'FileStorage') ? fileShareNamesArray : []

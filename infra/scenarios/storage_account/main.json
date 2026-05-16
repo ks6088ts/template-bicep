@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "15139699157881700423"
+      "templateHash": "6328895453273010805"
     }
   },
   "definitions": {
@@ -425,7 +425,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "1558311526684081399"
+              "templateHash": "15636897314177771194"
             }
           },
           "parameters": {
@@ -622,6 +622,30 @@
                 "description": "File share soft delete retention days"
               }
             }
+          },
+          "variables": {
+            "copy": [
+              {
+                "name": "blobContainerNamesArray",
+                "count": "[length(parameters('blobContainers'))]",
+                "input": "[parameters('blobContainers')[copyIndex('blobContainerNamesArray')].name]"
+              },
+              {
+                "name": "queueNamesArray",
+                "count": "[length(parameters('queues'))]",
+                "input": "[parameters('queues')[copyIndex('queueNamesArray')].name]"
+              },
+              {
+                "name": "tableNamesArray",
+                "count": "[length(parameters('tables'))]",
+                "input": "[parameters('tables')[copyIndex('tableNamesArray')].name]"
+              },
+              {
+                "name": "fileShareNamesArray",
+                "count": "[length(parameters('fileShares'))]",
+                "input": "[parameters('fileShares')[copyIndex('fileShareNamesArray')].name]"
+              }
+            ]
           },
           "resources": [
             {
@@ -834,40 +858,28 @@
               "metadata": {
                 "description": "The names of created blob containers"
               },
-              "copy": {
-                "count": "[length(parameters('blobContainers'))]",
-                "input": "[parameters('blobContainers')[copyIndex()].name]"
-              }
+              "value": "[if(or(equals(parameters('kind'), 'StorageV2'), equals(parameters('kind'), 'BlockBlobStorage')), variables('blobContainerNamesArray'), createArray())]"
             },
             "queueNames": {
               "type": "array",
               "metadata": {
                 "description": "The names of created queues"
               },
-              "copy": {
-                "count": "[length(parameters('queues'))]",
-                "input": "[parameters('queues')[copyIndex()].name]"
-              }
+              "value": "[if(equals(parameters('kind'), 'StorageV2'), variables('queueNamesArray'), createArray())]"
             },
             "tableNames": {
               "type": "array",
               "metadata": {
                 "description": "The names of created tables"
               },
-              "copy": {
-                "count": "[length(parameters('tables'))]",
-                "input": "[parameters('tables')[copyIndex()].name]"
-              }
+              "value": "[if(equals(parameters('kind'), 'StorageV2'), variables('tableNamesArray'), createArray())]"
             },
             "fileShareNames": {
               "type": "array",
               "metadata": {
                 "description": "The names of created file shares"
               },
-              "copy": {
-                "count": "[length(parameters('fileShares'))]",
-                "input": "[parameters('fileShares')[copyIndex()].name]"
-              }
+              "value": "[if(or(equals(parameters('kind'), 'StorageV2'), equals(parameters('kind'), 'FileStorage')), variables('fileShareNamesArray'), createArray())]"
             }
           }
         }
