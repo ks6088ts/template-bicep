@@ -3,9 +3,10 @@
 // ------------------
 
 @description('The name of the target Azure AI Foundry account resource')
-@minLength(2)
-@maxLength(59)
-param targetAccountName string
+param targetAccountName string = ''
+
+@description('The name of the target Azure Storage Account resource')
+param targetStorageAccountName string = ''
 
 @description('The principal ID that receives the role assignment')
 @minLength(1)
@@ -32,8 +33,9 @@ param roleAssignmentNameSeed string = ''
 //    VARIABLES
 // ------------------
 
+var targetResourceName = !empty(targetStorageAccountName) ? targetStorageAccountName : targetAccountName
 var roleAssignmentName = empty(roleAssignmentNameSeed)
-  ? guid(targetAccountName, principalId, roleDefinitionId)
+  ? guid(targetResourceName, principalId, roleDefinitionId)
   : roleAssignmentNameSeed
 
 // ------------------
@@ -41,13 +43,27 @@ var roleAssignmentName = empty(roleAssignmentNameSeed)
 // ------------------
 
 // NOTE: API version pinned to `2025-06-01` to match the parent Foundry account module.
-resource targetAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = {
+resource targetAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (!empty(targetAccountName) && empty(targetStorageAccountName)) {
   name: targetAccountName
 }
 
-resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource targetStorageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if (!empty(targetStorageAccountName)) {
+  name: targetStorageAccountName
+}
+
+resource roleAssignmentToAccount 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(targetAccountName) && empty(targetStorageAccountName)) {
   name: roleAssignmentName
   scope: targetAccount
+  properties: {
+    principalId: principalId
+    roleDefinitionId: roleDefinitionId
+    principalType: principalType
+  }
+}
+
+resource roleAssignmentToStorageAccount 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(targetStorageAccountName)) {
+  name: roleAssignmentName
+  scope: targetStorageAccount
   properties: {
     principalId: principalId
     roleDefinitionId: roleDefinitionId
@@ -60,7 +76,7 @@ resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 // ------------------
 
 @description('The resource ID of the role assignment')
-output id string = roleAssignment.id
+output id string = roleAssignmentToStorageAccount.?id ?? roleAssignmentToAccount.?id ?? ''
 
 @description('The name of the role assignment')
-output name string = roleAssignment.name
+output name string = roleAssignmentToStorageAccount.?name ?? roleAssignmentToAccount.?name ?? roleAssignmentName

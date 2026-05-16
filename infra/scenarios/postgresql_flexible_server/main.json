@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.43.8.12551",
-      "templateHash": "5703160322773700439"
+      "version": "0.42.1.51946",
+      "templateHash": "6457791408098310038"
     }
   },
   "parameters": {
@@ -181,8 +181,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "13006231347032579543"
+              "version": "0.42.1.51946",
+              "templateHash": "10375022168103187164"
             }
           },
           "parameters": {
@@ -295,8 +295,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "11018863908357162830"
+              "version": "0.42.1.51946",
+              "templateHash": "12362911082645376857"
             }
           },
           "parameters": {
@@ -575,8 +575,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "15282767757597819840"
+              "version": "0.42.1.51946",
+              "templateHash": "9009423525462246214"
             }
           },
           "parameters": {
@@ -676,8 +676,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "12549242387600695814"
+              "version": "0.42.1.51946",
+              "templateHash": "8997329386148044417"
             }
           },
           "parameters": {
@@ -710,6 +710,25 @@
                 "description": "The name of the existing Azure Database for PostgreSQL Flexible Server that diagnostic settings will be applied to. Provide either this or targetAccountName."
               }
             },
+            "targetStorageAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "The name of the existing Azure Storage Account that diagnostic settings will be applied to. Provide this to create diagnostic settings on storage sub-services."
+              }
+            },
+            "storageServices": {
+              "type": "array",
+              "defaultValue": [
+                "blob",
+                "queue",
+                "table",
+                "file"
+              ],
+              "metadata": {
+                "description": "The storage services to configure diagnostics for when targetStorageAccountName is provided."
+              }
+            },
             "logs": {
               "type": "array",
               "defaultValue": [
@@ -735,6 +754,10 @@
               }
             }
           },
+          "variables": {
+            "diagnosticSettingsResourceId": "[coalesce(coalesce(coalesce(coalesce(coalesce(coalesce(if(and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'blob')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/blobServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', format('{0}-blob', parameters('name'))), null()), if(and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'queue')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/queueServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', format('{0}-queue', parameters('name'))), null())), if(and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'table')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/tableServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', format('{0}-table', parameters('name'))), null())), if(and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'file')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/fileServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', format('{0}-file', parameters('name'))), null())), if(not(empty(parameters('targetServerName'))), extensionResourceId(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), if(not(empty(parameters('targetAccountName'))), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), '')]",
+            "diagnosticSettingsResourceName": "[coalesce(coalesce(coalesce(coalesce(coalesce(coalesce(if(and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'blob')), format('{0}-blob', parameters('name')), null()), if(and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'queue')), format('{0}-queue', parameters('name')), null())), if(and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'table')), format('{0}-table', parameters('name')), null())), if(and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'file')), format('{0}-file', parameters('name')), null())), if(not(empty(parameters('targetServerName'))), parameters('name'), null())), if(not(empty(parameters('targetAccountName'))), parameters('name'), null())), parameters('name'))]"
+          },
           "resources": [
             {
               "condition": "[not(empty(parameters('targetAccountName')))]",
@@ -759,6 +782,54 @@
                 "logs": "[parameters('logs')]",
                 "metrics": "[parameters('metrics')]"
               }
+            },
+            {
+              "condition": "[and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'blob'))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/blobServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
+              "name": "[format('{0}-blob', parameters('name'))]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            },
+            {
+              "condition": "[and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'queue'))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/queueServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
+              "name": "[format('{0}-queue', parameters('name'))]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            },
+            {
+              "condition": "[and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'table'))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/tableServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
+              "name": "[format('{0}-table', parameters('name'))]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
+            },
+            {
+              "condition": "[and(not(empty(parameters('targetStorageAccountName'))), contains(parameters('storageServices'), 'file'))]",
+              "type": "Microsoft.Insights/diagnosticSettings",
+              "apiVersion": "2021-05-01-preview",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/fileServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
+              "name": "[format('{0}-file', parameters('name'))]",
+              "properties": {
+                "workspaceId": "[parameters('workspaceResourceId')]",
+                "logs": "[parameters('logs')]",
+                "metrics": "[parameters('metrics')]"
+              }
             }
           ],
           "outputs": {
@@ -767,14 +838,14 @@
               "metadata": {
                 "description": "The resource ID of the diagnostic settings resource"
               },
-              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), extensionResourceId(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), if(not(empty(parameters('targetAccountName'))), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), '')]"
+              "value": "[variables('diagnosticSettingsResourceId')]"
             },
             "name": {
               "type": "string",
               "metadata": {
                 "description": "The name of the diagnostic settings resource"
               },
-              "value": "[coalesce(coalesce(if(not(empty(parameters('targetServerName'))), parameters('name'), null()), if(not(empty(parameters('targetAccountName'))), parameters('name'), null())), parameters('name'))]"
+              "value": "[variables('diagnosticSettingsResourceName')]"
             }
           }
         }
