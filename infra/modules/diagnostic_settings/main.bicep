@@ -147,6 +147,7 @@ resource diagnosticSettingsFileService 'Microsoft.Insights/diagnosticSettings@20
   }
 }
 
+// Precedence: storage sub-service diagnostics (blob/queue/table/file), then PostgreSQL, then Foundry.
 var diagnosticSettingsResourceId = diagnosticSettingsBlobService.?id ?? diagnosticSettingsQueueService.?id ?? diagnosticSettingsTableService.?id ?? diagnosticSettingsFileService.?id ?? diagnosticSettingsServer.?id ?? diagnosticSettingsAccount.?id ?? ''
 var diagnosticSettingsResourceName = diagnosticSettingsBlobService.?name ?? diagnosticSettingsQueueService.?name ?? diagnosticSettingsTableService.?name ?? diagnosticSettingsFileService.?name ?? diagnosticSettingsServer.?name ?? diagnosticSettingsAccount.?name ?? name
 
