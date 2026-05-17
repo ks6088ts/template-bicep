@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "4687835012707299667"
+      "templateHash": "240624163838610761"
     }
   },
   "definitions": {
@@ -201,9 +201,10 @@
     }
   },
   "variables": {
-    "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
-    "foundryAccountName": "[take(toLower(replace(format('aif-{0}', parameters('name')), '_', '-')), 59)]",
-    "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]",
+    "foundryBaseName": "[replace(parameters('name'), 'microsoft', '')]",
+    "resourceGroupName": "[format('rg-templatebicep-{0}', parameters('name'))]",
+    "foundryAccountName": "[take(toLower(replace(format('aif-{0}', variables('foundryBaseName')), '_', '-')), 59)]",
+    "foundryProjectName": "[take(format('proj-{0}', variables('foundryBaseName')), 64)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
     "applicationInsightsName": "[take(toLower(replace(format('appi-{0}', parameters('name')), '_', '-')), 260)]",
     "foundryDiagnosticSettingsName": "[take(format('diag-{0}', variables('foundryAccountName')), 64)]",

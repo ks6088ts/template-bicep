@@ -144,7 +144,7 @@ param enableObservability bool = false
 //    VARIABLES
 // ------------------
 
-var resourceGroupName = 'rg-${name}'
+var resourceGroupName = 'rg-templatebicep-${name}'
 var storageAccountName = take(toLower(replace(replace('st${name}', '_', ''), '-', '')), 24)
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var storageDiagnosticSettingsName = take('diag-${storageAccountName}', 64)

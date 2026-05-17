@@ -72,7 +72,7 @@ param enableObservability bool = false
 //    VARIABLES
 // ------------------
 
-var resourceGroupName = 'rg-${name}'
+var resourceGroupName = 'rg-templatebicep-${name}'
 var postgresServerName = take(toLower(replace('psql-${name}', '_', '-')), 63)
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var postgresDiagnosticSettingsName = take('diag-${postgresServerName}', 256)

@@ -1,6 +1,6 @@
 using 'main.bicep'
 
-param name = 'templatebicepstorage'
+param name = 'storageaccount'
 param location = 'japaneast'
 param tags = {
   environment: 'dev'

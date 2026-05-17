@@ -109,9 +109,10 @@ param roleDefinitionIds string[] = [
 //    VARIABLES
 // ------------------
 
-var resourceGroupName = 'rg-${name}'
-var foundryAccountName = take(toLower(replace('aif-${name}', '_', '-')), 59)
-var foundryProjectName = take('proj-${name}', 64)
+var foundryBaseName = replace(name, 'microsoft', '')
+var resourceGroupName = 'rg-templatebicep-${name}'
+var foundryAccountName = take(toLower(replace('aif-${foundryBaseName}', '_', '-')), 59)
+var foundryProjectName = take('proj-${foundryBaseName}', 64)
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var applicationInsightsName = take(toLower(replace('appi-${name}', '_', '-')), 260)
 var foundryDiagnosticSettingsName = take('diag-${foundryAccountName}', 64)

@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "8957486075804710574"
+      "templateHash": "12615693296825351766"
     }
   },
   "definitions": {
@@ -56,12 +56,12 @@
         "$ref": "#/definitions/userAssignedIdentitySpec"
       },
       "metadata": {
-        "description": "Array of User Assigned Managed Identities to create in the shared resource group `rg-{name}`. Names must be unique within the array."
+        "description": "Array of User Assigned Managed Identities to create in the shared resource group `rg-templatebicep-{name}`. Names must be unique within the array."
       }
     }
   },
   "variables": {
-    "resourceGroupName": "[format('rg-{0}', parameters('name'))]"
+    "resourceGroupName": "[format('rg-templatebicep-{0}', parameters('name'))]"
   },
   "resources": {
     "resourceGroup": {

@@ -1,4 +1,4 @@
 using 'main.bicep'
 
-param name = 'hello_world'
+param name = 'helloworld'
 param location = 'japaneast'

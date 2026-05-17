@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "11019778850639712940"
+      "templateHash": "16774599653878297185"
     }
   },
   "parameters": {
@@ -145,7 +145,7 @@
     }
   },
   "variables": {
-    "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
+    "resourceGroupName": "[format('rg-templatebicep-{0}', parameters('name'))]",
     "postgresServerName": "[take(toLower(replace(format('psql-{0}', parameters('name')), '_', '-')), 63)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
     "postgresDiagnosticSettingsName": "[take(format('diag-{0}', variables('postgresServerName')), 256)]",
