@@ -3,12 +3,10 @@
 // ------------------
 
 @description('The name of the parent Azure AI Foundry account')
-@minLength(2)
 @maxLength(59)
 param parentAccountName string
 
 @description('The name of the Azure AI Foundry project')
-@minLength(2)
 @maxLength(64)
 param name string
 
@@ -16,7 +14,6 @@ param name string
 param location string
 
 @description('The display name of the Azure AI Foundry project')
-@minLength(2)
 @maxLength(64)
 param displayName string = name
 
@@ -52,9 +49,11 @@ resource foundryProject 'Microsoft.CognitiveServices/accounts/projects@2025-06-0
   }
   properties: {
     displayName: displayName
-    ...(empty(projectDescription) ? {} : {
-      description: projectDescription
-    })
+    ...(empty(projectDescription)
+      ? {}
+      : {
+          description: projectDescription
+        })
   }
 }
 

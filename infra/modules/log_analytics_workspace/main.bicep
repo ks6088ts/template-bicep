@@ -3,7 +3,6 @@
 // ------------------
 
 @description('The name of the Log Analytics workspace')
-@minLength(4)
 @maxLength(63)
 param name string
 

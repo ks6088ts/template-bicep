@@ -3,7 +3,6 @@
 // ------------------
 
 @description('The name of the Storage Account. Must be 3-24 characters and lowercase alphanumeric.')
-@minLength(3)
 @maxLength(24)
 param name string
 
@@ -130,22 +129,27 @@ var requestedQueueNames = [for queue in queues: queue.name]
 var requestedTableNames = [for table in tables: table.name]
 var requestedFileShareNames = [for share in fileShares: share.name]
 
-var storageAccountProperties = union({
-  allowSharedKeyAccess: allowSharedKeyAccess
-  defaultToOAuthAuthentication: true
-  allowBlobPublicAccess: false
-  allowCrossTenantReplication: false
-  supportsHttpsTrafficOnly: true
-  minimumTlsVersion: minimumTlsVersion
-  publicNetworkAccess: publicNetworkAccess
-  networkAcls: {
-    bypass: 'AzureServices'
-    defaultAction: networkAclsDefaultAction
-  }
-}, kind == 'StorageV2' ? {
-  accessTier: accessTier
-  isHnsEnabled: enableHierarchicalNamespace
-} : {})
+var storageAccountProperties = union(
+  {
+    allowSharedKeyAccess: allowSharedKeyAccess
+    defaultToOAuthAuthentication: true
+    allowBlobPublicAccess: false
+    allowCrossTenantReplication: false
+    supportsHttpsTrafficOnly: true
+    minimumTlsVersion: minimumTlsVersion
+    publicNetworkAccess: publicNetworkAccess
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: networkAclsDefaultAction
+    }
+  },
+  kind == 'StorageV2'
+    ? {
+        accessTier: accessTier
+        isHnsEnabled: enableHierarchicalNamespace
+      }
+    : {}
+)
 
 // ------------------
 //    RESOURCES

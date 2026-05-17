@@ -3,7 +3,6 @@
 // ------------------
 
 @description('The name of the parent Azure AI Foundry account')
-@minLength(2)
 @maxLength(59)
 param parentAccountName string
 
@@ -59,13 +58,17 @@ resource modelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-
     model: {
       format: modelFormat
       name: modelName
-      ...(empty(modelVersion) ? {} : {
-        version: modelVersion
-      })
+      ...(empty(modelVersion)
+        ? {}
+        : {
+            version: modelVersion
+          })
     }
-    ...(empty(raiPolicyName) ? {} : {
-      raiPolicyName: raiPolicyName
-    })
+    ...(empty(raiPolicyName)
+      ? {}
+      : {
+          raiPolicyName: raiPolicyName
+        })
   }
 }
 

@@ -3,7 +3,6 @@
 // ------------------
 
 @description('The name of the Azure Database for PostgreSQL Flexible Server')
-@minLength(3)
 @maxLength(63)
 param name string
 

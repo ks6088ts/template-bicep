@@ -13,7 +13,7 @@ type uamiReference = {
   resourceGroup: string
 }
 
-@description('A (UAMI, role definition) pair generated for each role assignment iteration.')
+@description('A (UAMI, role definition) pair for granting storage data permissions to an existing UAMI at Storage Account scope.')
 type uamiRolePair = {
   @description('Index of the UAMI in `existingUserAssignedIdentities` whose principalId receives the role.')
   uamiIndex: int
@@ -22,10 +22,13 @@ type uamiRolePair = {
   roleDefinitionGuid: string
 }
 
-@description('A (principal object ID, role definition) pair generated for each service principal/user role assignment iteration.')
+@description('A (principal, role definition) pair for granting storage data permissions to an existing service principal or user at Storage Account scope.')
 type principalRolePair = {
   @description('The Microsoft Entra principal (object) ID that receives the role.')
   principalId: string
+
+  @description('The principal type for the role assignment.')
+  principalType: 'ServicePrincipal' | 'User'
 
   @description('Role definition GUID to grant at Storage Account scope.')
   roleDefinitionGuid: string
@@ -146,35 +149,39 @@ var storageAccountName = take(toLower(replace(replace('st${name}', '_', ''), '-'
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var storageDiagnosticSettingsName = take('diag-${storageAccountName}', 64)
 
-// Cross-product each identity array with `roleDefinitionIds` into a flat list of struct pairs.
-// `map`/`flatten` keep the cross product readable and naturally produce an empty list when the
-// identity array is empty, so no flag variables or `if` guards are required at the loop sites.
+// Cross-product each identity source with `roleDefinitionIds` into flat lists. `map`/`flatten`
+// naturally produce empty lists for empty inputs, so no flag variables or `if` guards are needed
+// at the loop sites. UAMI principalIds are resolved at deployment time inside the module loop
+// (Bicep requires compile-time-known values in `var` cross products and `for` counts).
 var uamiRolePairs uamiRolePair[] = flatten(map(
   range(0, length(existingUserAssignedIdentities)),
   uamiIndex =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
+    map(roleDefinitionIds, role => {
       uamiIndex: uamiIndex
-      roleDefinitionGuid: roleDefinitionGuid
+      roleDefinitionGuid: role
     })
 ))
 
-var servicePrincipalRolePairs principalRolePair[] = flatten(map(
-  existingServicePrincipalObjectIds,
-  principalId =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
-      principalId: principalId
-      roleDefinitionGuid: roleDefinitionGuid
-    })
-))
-
-var userRolePairs principalRolePair[] = flatten(map(
-  existingUserObjectIds,
-  principalId =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
-      principalId: principalId
-      roleDefinitionGuid: roleDefinitionGuid
-    })
-))
+var principalRolePairs principalRolePair[] = concat(
+  flatten(map(
+    existingServicePrincipalObjectIds,
+    pid =>
+      map(roleDefinitionIds, role => {
+        principalId: pid
+        principalType: 'ServicePrincipal'
+        roleDefinitionGuid: role
+      })
+  )),
+  flatten(map(
+    existingUserObjectIds,
+    pid =>
+      map(roleDefinitionIds, role => {
+        principalId: pid
+        principalType: 'User'
+        roleDefinitionGuid: role
+      })
+  ))
+)
 
 // ------------------
 //    EXISTING RESOURCES
@@ -204,7 +211,6 @@ module storageAccount '../../modules/storage_account/main.bicep' = {
   name: take('${name}-storage-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     name: storageAccountName
     location: location
     tags: tags
@@ -226,7 +232,6 @@ module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' 
   name: take('${name}-law-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     name: logAnalyticsWorkspaceName
     location: location
     tags: tags
@@ -240,8 +245,8 @@ module storageDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' 
   params: {
     name: storageDiagnosticSettingsName
     workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
-    #disable-next-line BCP334
-    targetStorageAccountName: storageAccountName
+    targetKind: 'StorageAccount'
+    targetName: storageAccountName
   }
   dependsOn: [
     storageAccount
@@ -253,47 +258,28 @@ module uamiRoleAssignments '../../modules/role_assignment/main.bicep' = [
     name: take('${name}-uami-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
-      #disable-next-line BCP334
-      targetStorageAccountName: storageAccountName
+      targetKind: 'StorageAccount'
+      targetName: storageAccountName
       principalId: uamis[pair.uamiIndex].properties.principalId
-      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
-      roleAssignmentNameSeed: guid(
-        storageAccount.outputs.id,
-        uamis[pair.uamiIndex].properties.principalId,
-        pair.roleDefinitionGuid
-      )
       principalType: 'ServicePrincipal'
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
     }
+    dependsOn: [storageAccount]
   }
 ]
 
-module servicePrincipalRoleAssignments '../../modules/role_assignment/main.bicep' = [
-  for (pair, i) in servicePrincipalRolePairs: {
-    name: take('${name}-sp-role-${i}-deployment', 64)
+module principalRoleAssignments '../../modules/role_assignment/main.bicep' = [
+  for (pair, i) in principalRolePairs: {
+    name: take('${name}-principal-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
-      #disable-next-line BCP334
-      targetStorageAccountName: storageAccountName
+      targetKind: 'StorageAccount'
+      targetName: storageAccountName
       principalId: pair.principalId
+      principalType: pair.principalType
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
-      roleAssignmentNameSeed: guid(storageAccount.outputs.id, pair.principalId, pair.roleDefinitionGuid)
-      principalType: 'ServicePrincipal'
     }
-  }
-]
-
-module userRoleAssignments '../../modules/role_assignment/main.bicep' = [
-  for (pair, i) in userRolePairs: {
-    name: take('${name}-user-role-${i}-deployment', 64)
-    scope: az.resourceGroup(resourceGroupName)
-    params: {
-      #disable-next-line BCP334
-      targetStorageAccountName: storageAccountName
-      principalId: pair.principalId
-      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
-      roleAssignmentNameSeed: guid(storageAccount.outputs.id, pair.principalId, pair.roleDefinitionGuid)
-      principalType: 'User'
-    }
+    dependsOn: [storageAccount]
   }
 ]
 
@@ -346,14 +332,10 @@ output fileShareNames array = storageAccount.outputs.fileShareNames
 @description('The resource ID of the created Log Analytics workspace (empty when observability is disabled)')
 output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.?outputs.id ?? ''
 
-@description('The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)')
+@description('Resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached).')
 output uamiRoleAssignmentIds string[] = [for (pair, i) in uamiRolePairs: uamiRoleAssignments[i].outputs.id]
 
-@description('The resource IDs of role assignments granted to every existing service principal (empty when no service principal is attached)')
-output servicePrincipalRoleAssignmentIds string[] = [
-  for (pair, i) in servicePrincipalRolePairs: servicePrincipalRoleAssignments[i].outputs.id
+@description('Resource IDs of role assignments granted to every existing service principal and user (empty when none are attached).')
+output principalRoleAssignmentIds string[] = [
+  for (pair, i) in principalRolePairs: principalRoleAssignments[i].outputs.id
 ]
-
-@description('The resource IDs of role assignments granted to every existing user (empty when no user is attached)')
-output userRoleAssignmentIds string[] = [for (pair, i) in userRolePairs: userRoleAssignments[i].outputs.id]
-

@@ -107,7 +107,6 @@ module postgresServer '../../modules/postgresql_flexible_server/main.bicep' = {
   name: take('${name}-psql-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     name: postgresServerName
     location: location
     tags: tags
@@ -127,7 +126,6 @@ module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' 
   name: take('${name}-law-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     name: logAnalyticsWorkspaceName
     location: location
     tags: tags
@@ -141,8 +139,8 @@ module postgresDiagnosticSettings '../../modules/diagnostic_settings/main.bicep'
   params: {
     name: postgresDiagnosticSettingsName
     workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
-    #disable-next-line BCP334
-    targetServerName: postgresServerName
+    targetKind: 'PostgreSqlFlexibleServer'
+    targetName: postgresServerName
   }
   dependsOn: [postgresServer]
 }

@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "222378873996971655"
+      "templateHash": "18310597549337798033"
     }
   },
   "definitions": {
@@ -47,7 +47,7 @@
         }
       },
       "metadata": {
-        "description": "A (UAMI, role definition) pair generated for each role assignment iteration."
+        "description": "A (UAMI, role definition) pair for granting storage data permissions to an existing UAMI at Storage Account scope."
       }
     },
     "principalRolePair": {
@@ -59,6 +59,16 @@
             "description": "The Microsoft Entra principal (object) ID that receives the role."
           }
         },
+        "principalType": {
+          "type": "string",
+          "allowedValues": [
+            "ServicePrincipal",
+            "User"
+          ],
+          "metadata": {
+            "description": "The principal type for the role assignment."
+          }
+        },
         "roleDefinitionGuid": {
           "type": "string",
           "metadata": {
@@ -67,7 +77,7 @@
         }
       },
       "metadata": {
-        "description": "A (principal object ID, role definition) pair generated for each service principal/user role assignment iteration."
+        "description": "A (principal, role definition) pair for granting storage data permissions to an existing service principal or user at Storage Account scope."
       }
     }
   },
@@ -262,9 +272,8 @@
     "storageAccountName": "[take(toLower(replace(replace(format('st{0}', parameters('name')), '_', ''), '-', '')), 24)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
     "storageDiagnosticSettingsName": "[take(format('diag-{0}', variables('storageAccountName')), 64)]",
-    "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
-    "servicePrincipalRolePairs": "[flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
-    "userRolePairs": "[flatten(map(parameters('existingUserObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]"
+    "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('role', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('role')))))))]",
+    "principalRolePairs": "[concat(flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('pid', map(parameters('roleDefinitionIds'), lambda('role', createObject('principalId', lambdaVariables('pid'), 'principalType', 'ServicePrincipal', 'roleDefinitionGuid', lambdaVariables('role'))))))), flatten(map(parameters('existingUserObjectIds'), lambda('pid', map(parameters('roleDefinitionIds'), lambda('role', createObject('principalId', lambdaVariables('pid'), 'principalType', 'User', 'roleDefinitionGuid', lambdaVariables('role'))))))))]"
   },
   "resources": {
     "uamis": {
@@ -425,13 +434,12 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "3912676843792972109"
+              "templateHash": "1675377928906990828"
             }
           },
           "parameters": {
             "name": {
               "type": "string",
-              "minLength": 3,
               "maxLength": 24,
               "metadata": {
                 "description": "The name of the Storage Account. Must be 3-24 characters and lowercase alphanumeric."
@@ -904,13 +912,12 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "15282767757597819840"
+              "templateHash": "6506528013852670084"
             }
           },
           "parameters": {
             "name": {
               "type": "string",
-              "minLength": 4,
               "maxLength": 63,
               "metadata": {
                 "description": "The name of the Log Analytics workspace"
@@ -994,7 +1001,10 @@
           "workspaceResourceId": {
             "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
           },
-          "targetStorageAccountName": {
+          "targetKind": {
+            "value": "StorageAccount"
+          },
+          "targetName": {
             "value": "[variables('storageAccountName')]"
           }
         },
@@ -1005,44 +1015,38 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "12159027116501165986"
+              "templateHash": "327688079059744428"
             }
           },
           "parameters": {
             "name": {
               "type": "string",
-              "minLength": 1,
               "maxLength": 256,
               "metadata": {
-                "description": "The name of the diagnostic settings resource"
+                "description": "The name of the diagnostic settings resource."
               }
             },
             "workspaceResourceId": {
               "type": "string",
-              "minLength": 1,
               "metadata": {
-                "description": "The resource ID of the Log Analytics workspace destination"
+                "description": "The resource ID of the Log Analytics workspace destination."
               }
             },
-            "targetAccountName": {
+            "targetKind": {
               "type": "string",
-              "defaultValue": "",
+              "allowedValues": [
+                "CognitiveServicesAccount",
+                "PostgreSqlFlexibleServer",
+                "StorageAccount"
+              ],
               "metadata": {
-                "description": "The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to. Provide either this or targetServerName."
+                "description": "Kind of the resource that diagnostic settings will be applied to."
               }
             },
-            "targetServerName": {
+            "targetName": {
               "type": "string",
-              "defaultValue": "",
               "metadata": {
-                "description": "The name of the existing Azure Database for PostgreSQL Flexible Server that diagnostic settings will be applied to. Provide either this or targetAccountName."
-              }
-            },
-            "targetStorageAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "The name of the existing Azure Storage Account that diagnostic settings will be applied to. When set, diagnostic settings are created at the storage sub-service scopes (blob/queue/table/file)."
+                "description": "Name of the target resource."
               }
             },
             "storageServices": {
@@ -1054,7 +1058,7 @@
                 "file"
               ],
               "metadata": {
-                "description": "The storage sub-services to configure diagnostic settings for when targetStorageAccountName is set."
+                "description": "Storage sub-services to configure diagnostic settings for. Only used when `targetKind` is `StorageAccount`."
               }
             },
             "logs": {
@@ -1066,7 +1070,7 @@
                 }
               ],
               "metadata": {
-                "description": "The diagnostic log settings to configure"
+                "description": "Diagnostic log settings to configure."
               }
             },
             "metrics": {
@@ -1078,23 +1082,21 @@
                 }
               ],
               "metadata": {
-                "description": "The diagnostic metric settings to configure"
+                "description": "Diagnostic metric settings to configure."
               }
             }
           },
           "variables": {
-            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
-            "useServerTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetServerName'))))]",
-            "useAccountTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useServerTarget'))), not(empty(parameters('targetAccountName'))))]",
-            "storageDiagnosticSettingIds": "[concat(if(contains(parameters('storageServices'), 'blob'), createArray(coalesce(if(and(variables('useStorageTarget'), contains(parameters('storageServices'), 'blob')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/blobServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), '')), createArray()), if(contains(parameters('storageServices'), 'queue'), createArray(coalesce(if(and(variables('useStorageTarget'), contains(parameters('storageServices'), 'queue')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/queueServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), '')), createArray()), if(contains(parameters('storageServices'), 'table'), createArray(coalesce(if(and(variables('useStorageTarget'), contains(parameters('storageServices'), 'table')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/tableServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), '')), createArray()), if(contains(parameters('storageServices'), 'file'), createArray(coalesce(if(and(variables('useStorageTarget'), contains(parameters('storageServices'), 'file')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/fileServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), '')), createArray()))]",
-            "storageDiagnosticSettingId": "[if(greater(length(variables('storageDiagnosticSettingIds')), 0), variables('storageDiagnosticSettingIds')[0], '')]"
+            "isAccount": "[equals(parameters('targetKind'), 'CognitiveServicesAccount')]",
+            "isServer": "[equals(parameters('targetKind'), 'PostgreSqlFlexibleServer')]",
+            "isStorage": "[equals(parameters('targetKind'), 'StorageAccount')]"
           },
           "resources": [
             {
-              "condition": "[variables('useAccountTarget')]",
+              "condition": "[variables('isAccount')]",
               "type": "Microsoft.Insights/diagnosticSettings",
               "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName'))]",
               "name": "[parameters('name')]",
               "properties": {
                 "workspaceId": "[parameters('workspaceResourceId')]",
@@ -1103,10 +1105,10 @@
               }
             },
             {
-              "condition": "[variables('useServerTarget')]",
+              "condition": "[variables('isServer')]",
               "type": "Microsoft.Insights/diagnosticSettings",
               "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder'))]",
+              "scope": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', parameters('targetName'))]",
               "name": "[parameters('name')]",
               "properties": {
                 "workspaceId": "[parameters('workspaceResourceId')]",
@@ -1115,10 +1117,10 @@
               }
             },
             {
-              "condition": "[and(variables('useStorageTarget'), contains(parameters('storageServices'), 'blob'))]",
+              "condition": "[and(variables('isStorage'), contains(parameters('storageServices'), 'blob'))]",
               "type": "Microsoft.Insights/diagnosticSettings",
               "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts/blobServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('targetName'), 'default')]",
               "name": "[parameters('name')]",
               "properties": {
                 "workspaceId": "[parameters('workspaceResourceId')]",
@@ -1127,10 +1129,10 @@
               }
             },
             {
-              "condition": "[and(variables('useStorageTarget'), contains(parameters('storageServices'), 'queue'))]",
+              "condition": "[and(variables('isStorage'), contains(parameters('storageServices'), 'queue'))]",
               "type": "Microsoft.Insights/diagnosticSettings",
               "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts/queueServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/queueServices', parameters('targetName'), 'default')]",
               "name": "[parameters('name')]",
               "properties": {
                 "workspaceId": "[parameters('workspaceResourceId')]",
@@ -1139,10 +1141,10 @@
               }
             },
             {
-              "condition": "[and(variables('useStorageTarget'), contains(parameters('storageServices'), 'table'))]",
+              "condition": "[and(variables('isStorage'), contains(parameters('storageServices'), 'table'))]",
               "type": "Microsoft.Insights/diagnosticSettings",
               "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts/tableServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('targetName'), 'default')]",
               "name": "[parameters('name')]",
               "properties": {
                 "workspaceId": "[parameters('workspaceResourceId')]",
@@ -1151,10 +1153,10 @@
               }
             },
             {
-              "condition": "[and(variables('useStorageTarget'), contains(parameters('storageServices'), 'file'))]",
+              "condition": "[and(variables('isStorage'), contains(parameters('storageServices'), 'file'))]",
               "type": "Microsoft.Insights/diagnosticSettings",
               "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts/fileServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/fileServices', parameters('targetName'), 'default')]",
               "name": "[parameters('name')]",
               "properties": {
                 "workspaceId": "[parameters('workspaceResourceId')]",
@@ -1164,19 +1166,12 @@
             }
           ],
           "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the diagnostic settings resource"
-              },
-              "value": "[coalesce(coalesce(coalesce(if(variables('useServerTarget'), extensionResourceId(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), variables('storageDiagnosticSettingId')), '')]"
-            },
             "name": {
               "type": "string",
               "metadata": {
-                "description": "The name of the diagnostic settings resource"
+                "description": "The name of the diagnostic settings resource."
               },
-              "value": "[coalesce(coalesce(if(variables('useServerTarget'), parameters('name'), null()), if(variables('useAccountTarget'), parameters('name'), null())), parameters('name'))]"
+              "value": "[parameters('name')]"
             }
           }
         }
@@ -1201,20 +1196,20 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "targetStorageAccountName": {
+          "targetKind": {
+            "value": "StorageAccount"
+          },
+          "targetName": {
             "value": "[variables('storageAccountName')]"
           },
           "principalId": {
             "value": "[reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId]"
           },
-          "roleDefinitionId": {
-            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
-          },
-          "roleAssignmentNameSeed": {
-            "value": "[guid(reference('storageAccount').outputs.id.value, reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
-          },
           "principalType": {
             "value": "ServicePrincipal"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
           }
         },
         "template": {
@@ -1224,40 +1219,36 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "17141569987385327096"
+              "templateHash": "7584345935908390266"
             }
           },
           "parameters": {
-            "targetAccountName": {
+            "targetKind": {
               "type": "string",
-              "defaultValue": "",
-              "minLength": 0,
-              "maxLength": 59,
+              "allowedValues": [
+                "CognitiveServicesAccount",
+                "StorageAccount"
+              ],
               "metadata": {
-                "description": "The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this or targetStorageAccountName."
+                "description": "Kind of the resource that the role is scoped to."
               }
             },
-            "targetStorageAccountName": {
+            "targetName": {
               "type": "string",
-              "defaultValue": "",
-              "minLength": 0,
-              "maxLength": 24,
               "metadata": {
-                "description": "The name of the target Azure Storage Account resource. Provide either this or targetAccountName."
+                "description": "Name of the target resource (Cognitive Services account or Storage account)."
               }
             },
             "principalId": {
               "type": "string",
-              "minLength": 1,
               "metadata": {
-                "description": "The principal ID that receives the role assignment"
+                "description": "Principal (object) ID that receives the role assignment."
               }
             },
             "roleDefinitionId": {
               "type": "string",
-              "minLength": 1,
               "metadata": {
-                "description": "The fully qualified role definition resource ID"
+                "description": "Fully qualified role definition resource ID."
               }
             },
             "principalType": {
@@ -1271,28 +1262,20 @@
                 "User"
               ],
               "metadata": {
-                "description": "The principal type for the role assignment"
-              }
-            },
-            "roleAssignmentNameSeed": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+                "description": "Principal type for the role assignment."
               }
             }
           },
           "variables": {
-            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
-            "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
-            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), parameters('targetAccountName')), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+            "isStorage": "[equals(parameters('targetKind'), 'StorageAccount')]",
+            "roleAssignmentName": "[guid(parameters('targetKind'), parameters('targetName'), parameters('principalId'), parameters('roleDefinitionId'))]"
           },
           "resources": [
             {
-              "condition": "[variables('useAccountTarget')]",
+              "condition": "[not(variables('isStorage'))]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName'))]",
               "name": "[variables('roleAssignmentName')]",
               "properties": {
                 "principalId": "[parameters('principalId')]",
@@ -1301,10 +1284,10 @@
               }
             },
             {
-              "condition": "[variables('useStorageTarget')]",
+              "condition": "[variables('isStorage')]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'))]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('targetName'))]",
               "name": "[variables('roleAssignmentName')]",
               "properties": {
                 "principalId": "[parameters('principalId')]",
@@ -1317,34 +1300,33 @@
             "id": {
               "type": "string",
               "metadata": {
-                "description": "The resource ID of the role assignment"
+                "description": "The resource ID of the role assignment."
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+              "value": "[if(variables('isStorage'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', parameters('targetName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')))]"
             },
             "name": {
               "type": "string",
               "metadata": {
-                "description": "The name of the role assignment"
+                "description": "The name (GUID) of the role assignment."
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+              "value": "[variables('roleAssignmentName')]"
             }
           }
         }
       },
       "dependsOn": [
         "storageAccount",
-        "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]",
         "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]"
       ]
     },
-    "servicePrincipalRoleAssignments": {
+    "principalRoleAssignments": {
       "copy": {
-        "name": "servicePrincipalRoleAssignments",
-        "count": "[length(variables('servicePrincipalRolePairs'))]"
+        "name": "principalRoleAssignments",
+        "count": "[length(variables('principalRolePairs'))]"
       },
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-sp-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "name": "[take(format('{0}-principal-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1352,20 +1334,20 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "targetStorageAccountName": {
+          "targetKind": {
+            "value": "StorageAccount"
+          },
+          "targetName": {
             "value": "[variables('storageAccountName')]"
           },
           "principalId": {
-            "value": "[variables('servicePrincipalRolePairs')[copyIndex()].principalId]"
-          },
-          "roleDefinitionId": {
-            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
-          },
-          "roleAssignmentNameSeed": {
-            "value": "[guid(reference('storageAccount').outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[variables('principalRolePairs')[copyIndex()].principalId]"
           },
           "principalType": {
-            "value": "ServicePrincipal"
+            "value": "[variables('principalRolePairs')[copyIndex()].principalType]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('principalRolePairs')[copyIndex()].roleDefinitionGuid)]"
           }
         },
         "template": {
@@ -1375,40 +1357,36 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "17141569987385327096"
+              "templateHash": "7584345935908390266"
             }
           },
           "parameters": {
-            "targetAccountName": {
+            "targetKind": {
               "type": "string",
-              "defaultValue": "",
-              "minLength": 0,
-              "maxLength": 59,
+              "allowedValues": [
+                "CognitiveServicesAccount",
+                "StorageAccount"
+              ],
               "metadata": {
-                "description": "The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this or targetStorageAccountName."
+                "description": "Kind of the resource that the role is scoped to."
               }
             },
-            "targetStorageAccountName": {
+            "targetName": {
               "type": "string",
-              "defaultValue": "",
-              "minLength": 0,
-              "maxLength": 24,
               "metadata": {
-                "description": "The name of the target Azure Storage Account resource. Provide either this or targetAccountName."
+                "description": "Name of the target resource (Cognitive Services account or Storage account)."
               }
             },
             "principalId": {
               "type": "string",
-              "minLength": 1,
               "metadata": {
-                "description": "The principal ID that receives the role assignment"
+                "description": "Principal (object) ID that receives the role assignment."
               }
             },
             "roleDefinitionId": {
               "type": "string",
-              "minLength": 1,
               "metadata": {
-                "description": "The fully qualified role definition resource ID"
+                "description": "Fully qualified role definition resource ID."
               }
             },
             "principalType": {
@@ -1422,28 +1400,20 @@
                 "User"
               ],
               "metadata": {
-                "description": "The principal type for the role assignment"
-              }
-            },
-            "roleAssignmentNameSeed": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+                "description": "Principal type for the role assignment."
               }
             }
           },
           "variables": {
-            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
-            "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
-            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), parameters('targetAccountName')), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+            "isStorage": "[equals(parameters('targetKind'), 'StorageAccount')]",
+            "roleAssignmentName": "[guid(parameters('targetKind'), parameters('targetName'), parameters('principalId'), parameters('roleDefinitionId'))]"
           },
           "resources": [
             {
-              "condition": "[variables('useAccountTarget')]",
+              "condition": "[not(variables('isStorage'))]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName'))]",
               "name": "[variables('roleAssignmentName')]",
               "properties": {
                 "principalId": "[parameters('principalId')]",
@@ -1452,10 +1422,10 @@
               }
             },
             {
-              "condition": "[variables('useStorageTarget')]",
+              "condition": "[variables('isStorage')]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'))]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('targetName'))]",
               "name": "[variables('roleAssignmentName')]",
               "properties": {
                 "principalId": "[parameters('principalId')]",
@@ -1468,165 +1438,16 @@
             "id": {
               "type": "string",
               "metadata": {
-                "description": "The resource ID of the role assignment"
+                "description": "The resource ID of the role assignment."
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+              "value": "[if(variables('isStorage'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', parameters('targetName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')))]"
             },
             "name": {
               "type": "string",
               "metadata": {
-                "description": "The name of the role assignment"
+                "description": "The name (GUID) of the role assignment."
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "storageAccount"
-      ]
-    },
-    "userRoleAssignments": {
-      "copy": {
-        "name": "userRoleAssignments",
-        "count": "[length(variables('userRolePairs'))]"
-      },
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-user-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
-      "resourceGroup": "[variables('resourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "targetStorageAccountName": {
-            "value": "[variables('storageAccountName')]"
-          },
-          "principalId": {
-            "value": "[variables('userRolePairs')[copyIndex()].principalId]"
-          },
-          "roleDefinitionId": {
-            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
-          },
-          "roleAssignmentNameSeed": {
-            "value": "[guid(reference('storageAccount').outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
-          },
-          "principalType": {
-            "value": "User"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "17141569987385327096"
-            }
-          },
-          "parameters": {
-            "targetAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "minLength": 0,
-              "maxLength": 59,
-              "metadata": {
-                "description": "The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this or targetStorageAccountName."
-              }
-            },
-            "targetStorageAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "minLength": 0,
-              "maxLength": 24,
-              "metadata": {
-                "description": "The name of the target Azure Storage Account resource. Provide either this or targetAccountName."
-              }
-            },
-            "principalId": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The principal ID that receives the role assignment"
-              }
-            },
-            "roleDefinitionId": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The fully qualified role definition resource ID"
-              }
-            },
-            "principalType": {
-              "type": "string",
-              "defaultValue": "ServicePrincipal",
-              "allowedValues": [
-                "Device",
-                "ForeignGroup",
-                "Group",
-                "ServicePrincipal",
-                "User"
-              ],
-              "metadata": {
-                "description": "The principal type for the role assignment"
-              }
-            },
-            "roleAssignmentNameSeed": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
-              }
-            }
-          },
-          "variables": {
-            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
-            "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
-            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), parameters('targetAccountName')), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
-          },
-          "resources": [
-            {
-              "condition": "[variables('useAccountTarget')]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
-              "name": "[variables('roleAssignmentName')]",
-              "properties": {
-                "principalId": "[parameters('principalId')]",
-                "roleDefinitionId": "[parameters('roleDefinitionId')]",
-                "principalType": "[parameters('principalType')]"
-              }
-            },
-            {
-              "condition": "[variables('useStorageTarget')]",
-              "type": "Microsoft.Authorization/roleAssignments",
-              "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'))]",
-              "name": "[variables('roleAssignmentName')]",
-              "properties": {
-                "principalId": "[parameters('principalId')]",
-                "roleDefinitionId": "[parameters('roleDefinitionId')]",
-                "principalType": "[parameters('principalType')]"
-              }
-            }
-          ],
-          "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the role assignment"
-              },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the role assignment"
-              },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+              "value": "[variables('roleAssignmentName')]"
             }
           }
         }
@@ -1748,37 +1569,24 @@
         "type": "string"
       },
       "metadata": {
-        "description": "The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)"
+        "description": "Resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)."
       },
       "copy": {
         "count": "[length(variables('uamiRolePairs'))]",
         "input": "[reference(format('uamiRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
       }
     },
-    "servicePrincipalRoleAssignmentIds": {
+    "principalRoleAssignmentIds": {
       "type": "array",
       "items": {
         "type": "string"
       },
       "metadata": {
-        "description": "The resource IDs of role assignments granted to every existing service principal (empty when no service principal is attached)"
+        "description": "Resource IDs of role assignments granted to every existing service principal and user (empty when none are attached)."
       },
       "copy": {
-        "count": "[length(variables('servicePrincipalRolePairs'))]",
-        "input": "[reference(format('servicePrincipalRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
-      }
-    },
-    "userRoleAssignmentIds": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "metadata": {
-        "description": "The resource IDs of role assignments granted to every existing user (empty when no user is attached)"
-      },
-      "copy": {
-        "count": "[length(variables('userRolePairs'))]",
-        "input": "[reference(format('userRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+        "count": "[length(variables('principalRolePairs'))]",
+        "input": "[reference(format('principalRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
       }
     }
   }
