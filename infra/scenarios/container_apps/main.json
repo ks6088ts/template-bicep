@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.42.1.51946",
-      "templateHash": "5069928426531912979"
+      "templateHash": "9086378805641405332"
     }
   },
   "definitions": {
@@ -42,7 +42,7 @@
         "roleDefinitionGuid": {
           "type": "string",
           "metadata": {
-            "description": "Role definition GUID to grant at Foundry account scope."
+            "description": "Role definition GUID to grant at Container App scope."
           }
         }
       },
@@ -62,7 +62,7 @@
         "roleDefinitionGuid": {
           "type": "string",
           "metadata": {
-            "description": "Role definition GUID to grant at Foundry account scope."
+            "description": "Role definition GUID to grant at Container App scope."
           }
         }
       },
@@ -83,7 +83,7 @@
     "location": {
       "type": "string",
       "metadata": {
-        "description": "The location for the resource group and Azure AI Foundry resources"
+        "description": "The location for the resource group and Container Apps resources"
       }
     },
     "tags": {
@@ -96,6 +96,118 @@
         "description": "Tags applied to all resources"
       }
     },
+    "containerImage": {
+      "type": "string",
+      "defaultValue": "nginx:latest",
+      "metadata": {
+        "description": "Container image to run in the Container App"
+      }
+    },
+    "containerCommand": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional. Override container command"
+      }
+    },
+    "containerArgs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional. Override container args"
+      }
+    },
+    "cpu": {
+      "type": "string",
+      "defaultValue": "0.5",
+      "metadata": {
+        "description": "CPU allocation (vCPU). Example: 0.5"
+      }
+    },
+    "memory": {
+      "type": "string",
+      "defaultValue": "1Gi",
+      "metadata": {
+        "description": "Memory allocation. Example: 1Gi"
+      }
+    },
+    "minReplicas": {
+      "type": "int",
+      "defaultValue": 0,
+      "metadata": {
+        "description": "Minimum replicas"
+      }
+    },
+    "maxReplicas": {
+      "type": "int",
+      "defaultValue": 3,
+      "metadata": {
+        "description": "Maximum replicas"
+      }
+    },
+    "targetPort": {
+      "type": "int",
+      "defaultValue": 80,
+      "metadata": {
+        "description": "Ingress target port"
+      }
+    },
+    "ingressExternal": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "When true, enables external HTTPS ingress"
+      }
+    },
+    "acrSkuName": {
+      "type": "string",
+      "defaultValue": "Basic",
+      "allowedValues": [
+        "Basic",
+        "Standard",
+        "Premium"
+      ],
+      "metadata": {
+        "description": "The SKU name for the Azure Container Registry (ACR)"
+      }
+    },
+    "enableEasyAuth": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "When true, enables Easy Auth (built-in authentication) with Microsoft Entra ID on the Container App endpoint"
+      }
+    },
+    "easyAuthRequireAuthentication": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "When Easy Auth is enabled, require authentication (redirect unauthenticated clients to login)"
+      }
+    },
+    "easyAuthEntraClientId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Client ID of the Entra ID app registration (required when Easy Auth is enabled)"
+      }
+    },
+    "easyAuthAllowedAudiences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Allowed audiences for Easy Auth token validation"
+      }
+    },
     "existingUserAssignedIdentities": {
       "type": "array",
       "items": {
@@ -103,7 +215,7 @@
       },
       "defaultValue": [],
       "metadata": {
-        "description": "Optional. Array of existing User Assigned Managed Identities (UAMI) to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no UAMI is attached."
+        "description": "Optional. Array of existing User Assigned Managed Identities (UAMI) to attach to the Container App and grant roles at Container App scope. Defaults to an empty array."
       }
     },
     "existingServicePrincipalObjectIds": {
@@ -113,7 +225,7 @@
       },
       "defaultValue": [],
       "metadata": {
-        "description": "Optional. Array of object (principal) IDs of existing Microsoft Entra service principals to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no service principal is attached."
+        "description": "Optional. Array of object (principal) IDs of existing Microsoft Entra service principals to grant roles at Container App scope. Defaults to an empty array."
       }
     },
     "existingUserObjectIds": {
@@ -123,58 +235,7 @@
       },
       "defaultValue": [],
       "metadata": {
-        "description": "Optional. Array of object IDs of existing Microsoft Entra users to grant Azure AI Foundry inference permissions. Defaults to an empty array, in which case no user is attached."
-      }
-    },
-    "disableLocalAuth": {
-      "type": "bool",
-      "defaultValue": true,
-      "metadata": {
-        "description": "Disable local authentication (API keys) on the Azure AI Foundry account. Set to false to enable API key based authentication."
-      }
-    },
-    "enableObservability": {
-      "type": "bool",
-      "defaultValue": false,
-      "metadata": {
-        "description": "Enable Azure Monitor based observability resources (Log Analytics, Application Insights, diagnostic settings, and Foundry project tracing connection)."
-      }
-    },
-    "models": {
-      "type": "array",
-      "defaultValue": [
-        {
-          "name": "gpt-4o",
-          "modelName": "gpt-4o",
-          "modelFormat": "OpenAI",
-          "skuName": "GlobalStandard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "gpt-5",
-          "modelName": "gpt-5",
-          "modelVersion": "2025-08-07",
-          "modelFormat": "OpenAI",
-          "skuName": "GlobalStandard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "text-embedding-3-large",
-          "modelName": "text-embedding-3-large",
-          "modelFormat": "OpenAI",
-          "skuName": "Standard",
-          "skuCapacity": 50
-        },
-        {
-          "name": "text-embedding-3-small",
-          "modelName": "text-embedding-3-small",
-          "modelFormat": "OpenAI",
-          "skuName": "Standard",
-          "skuCapacity": 50
-        }
-      ],
-      "metadata": {
-        "description": "The list of model deployments to create in Azure AI Foundry. Defaults target models broadly available in regions such as japaneast; override via main.bicepparam if the target region/quota differs."
+        "description": "Optional. Array of object IDs of existing Microsoft Entra users to grant roles at Container App scope. Defaults to an empty array."
       }
     },
     "roleDefinitionIds": {
@@ -182,22 +243,27 @@
       "items": {
         "type": "string"
       },
-      "defaultValue": [
-        "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
-      ],
+      "defaultValue": [],
       "metadata": {
-        "description": "Role definition GUIDs assigned to every existing UAMI, service principal, and user at Azure AI Foundry account scope."
+        "description": "Role definition GUIDs assigned to every existing UAMI, service principal, and user at Container App scope. Defaults to empty array (no role assignments)."
       }
     }
   },
   "variables": {
+    "copy": [
+      {
+        "name": "existingUamiResourceIds",
+        "count": "[length(parameters('existingUserAssignedIdentities'))]",
+        "input": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('existingUserAssignedIdentities')[copyIndex('existingUamiResourceIds')].resourceGroup), 'Microsoft.ManagedIdentity/userAssignedIdentities', parameters('existingUserAssignedIdentities')[copyIndex('existingUamiResourceIds')].name)]"
+      }
+    ],
     "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
-    "foundryAccountName": "[take(toLower(replace(format('aif-{0}', parameters('name')), '_', '-')), 59)]",
-    "foundryProjectName": "[take(format('proj-{0}', parameters('name')), 64)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
-    "applicationInsightsName": "[take(toLower(replace(format('appi-{0}', parameters('name')), '_', '-')), 260)]",
-    "foundryDiagnosticSettingsName": "[take(format('diag-{0}', variables('foundryAccountName')), 64)]",
-    "foundryAppInsightsConnectionName": "[take(format('appinsights-{0}', variables('foundryProjectName')), 64)]",
+    "acrName": "[take(toLower(replace(replace(format('acr{0}', parameters('name')), '_', ''), '-', '')), 50)]",
+    "uamiName": "[take(toLower(replace(format('id-{0}', parameters('name')), '_', '-')), 128)]",
+    "containerAppEnvironmentName": "[take(toLower(replace(format('cae-{0}', parameters('name')), '_', '-')), 32)]",
+    "containerAppName": "[take(toLower(replace(format('ca-{0}', parameters('name')), '_', '-')), 32)]",
+    "acrPullRoleDefinitionGuid": "7f951dda-4ed3-4680-a7ca-43fe172d538d",
     "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
     "servicePrincipalRolePairs": "[flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
     "userRolePairs": "[flatten(map(parameters('existingUserObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]"
@@ -213,6 +279,13 @@
       "apiVersion": "2024-11-30",
       "resourceGroup": "[parameters('existingUserAssignedIdentities')[copyIndex()].resourceGroup]",
       "name": "[parameters('existingUserAssignedIdentities')[copyIndex()].name]"
+    },
+    "logAnalyticsWorkspaceResource": {
+      "existing": true,
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "name": "[variables('logAnalyticsWorkspaceName')]"
     },
     "resourceGroup": {
       "type": "Microsoft.Resources/deployments",
@@ -303,270 +376,7 @@
         }
       }
     },
-    "foundryAccount": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-foundry-account-deployment', parameters('name')), 64)]",
-      "resourceGroup": "[variables('resourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "name": {
-            "value": "[variables('foundryAccountName')]"
-          },
-          "location": {
-            "value": "[parameters('location')]"
-          },
-          "tags": {
-            "value": "[parameters('tags')]"
-          },
-          "disableLocalAuth": {
-            "value": "[parameters('disableLocalAuth')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "14969870481810061673"
-            }
-          },
-          "parameters": {
-            "name": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 59,
-              "metadata": {
-                "description": "The name of the Azure AI Foundry account"
-              }
-            },
-            "location": {
-              "type": "string",
-              "metadata": {
-                "description": "The Azure region where the Azure AI Foundry account will be created"
-              }
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {},
-              "metadata": {
-                "description": "Tags applied to the Azure AI Foundry account"
-              }
-            },
-            "customSubDomainName": {
-              "type": "string",
-              "defaultValue": "[parameters('name')]",
-              "minLength": 2,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The custom subdomain name for the Azure AI Foundry account endpoint"
-              }
-            },
-            "publicNetworkAccess": {
-              "type": "string",
-              "defaultValue": "Enabled",
-              "allowedValues": [
-                "Enabled",
-                "Disabled"
-              ],
-              "metadata": {
-                "description": "Controls public network access to the Azure AI Foundry account"
-              }
-            },
-            "disableLocalAuth": {
-              "type": "bool",
-              "defaultValue": true,
-              "metadata": {
-                "description": "Disable local authentication (API keys) and require Entra ID authentication"
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.CognitiveServices/accounts",
-              "apiVersion": "2025-06-01",
-              "name": "[parameters('name')]",
-              "location": "[parameters('location')]",
-              "kind": "AIServices",
-              "sku": {
-                "name": "S0"
-              },
-              "tags": "[parameters('tags')]",
-              "identity": {
-                "type": "SystemAssigned"
-              },
-              "properties": {
-                "customSubDomainName": "[parameters('customSubDomainName')]",
-                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
-                "disableLocalAuth": "[parameters('disableLocalAuth')]",
-                "allowProjectManagement": true
-              }
-            }
-          ],
-          "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the Azure AI Foundry account"
-              },
-              "value": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('name'))]"
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the Azure AI Foundry account"
-              },
-              "value": "[parameters('name')]"
-            },
-            "endpoint": {
-              "type": "string",
-              "metadata": {
-                "description": "The endpoint of the Azure AI Foundry account"
-              },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2025-06-01').endpoint]"
-            },
-            "principalId": {
-              "type": "string",
-              "metadata": {
-                "description": "The principal ID of the Azure AI Foundry account System Assigned Managed Identity"
-              },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('name')), '2025-06-01', 'full').identity.principalId]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "resourceGroup"
-      ]
-    },
-    "foundryProject": {
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-foundry-project-deployment', parameters('name')), 64)]",
-      "resourceGroup": "[variables('resourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
-          },
-          "name": {
-            "value": "[variables('foundryProjectName')]"
-          },
-          "location": {
-            "value": "[parameters('location')]"
-          },
-          "displayName": {
-            "value": "[variables('foundryProjectName')]"
-          },
-          "tags": {
-            "value": "[parameters('tags')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "26603214774380004"
-            }
-          },
-          "parameters": {
-            "parentAccountName": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 59,
-              "metadata": {
-                "description": "The name of the parent Azure AI Foundry account"
-              }
-            },
-            "name": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The name of the Azure AI Foundry project"
-              }
-            },
-            "location": {
-              "type": "string",
-              "metadata": {
-                "description": "The Azure region where the Azure AI Foundry project will be created"
-              }
-            },
-            "displayName": {
-              "type": "string",
-              "defaultValue": "[parameters('name')]",
-              "minLength": 2,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The display name of the Azure AI Foundry project"
-              }
-            },
-            "projectDescription": {
-              "type": "string",
-              "defaultValue": "",
-              "maxLength": 1024,
-              "metadata": {
-                "description": "The description of the Azure AI Foundry project"
-              }
-            },
-            "tags": {
-              "type": "object",
-              "defaultValue": {},
-              "metadata": {
-                "description": "Tags applied to the Azure AI Foundry project"
-              }
-            }
-          },
-          "resources": [
-            {
-              "type": "Microsoft.CognitiveServices/accounts/projects",
-              "apiVersion": "2025-06-01",
-              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
-              "location": "[parameters('location')]",
-              "tags": "[parameters('tags')]",
-              "identity": {
-                "type": "SystemAssigned"
-              },
-              "properties": "[shallowMerge(createArray(createObject('displayName', parameters('displayName')), if(empty(parameters('projectDescription')), createObject(), createObject('description', parameters('projectDescription')))))]"
-            }
-          ],
-          "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the Azure AI Foundry project"
-              },
-              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects', parameters('parentAccountName'), parameters('name'))]"
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the Azure AI Foundry project"
-              },
-              "value": "[parameters('name')]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "foundryAccount"
-      ]
-    },
     "logAnalyticsWorkspace": {
-      "condition": "[parameters('enableObservability')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "[take(format('{0}-law-deployment', parameters('name')), 64)]",
@@ -666,11 +476,10 @@
         "resourceGroup"
       ]
     },
-    "applicationInsights": {
-      "condition": "[parameters('enableObservability')]",
+    "containerRegistry": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-appi-deployment', parameters('name')), 64)]",
+      "name": "[take(format('{0}-acr-deployment', parameters('name')), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -679,13 +488,159 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('applicationInsightsName')]"
+            "value": "[variables('acrName')]"
           },
           "location": {
             "value": "[parameters('location')]"
           },
-          "workspaceResourceId": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "skuName": {
+            "value": "[parameters('acrSkuName')]"
+          },
+          "adminUserEnabled": {
+            "value": false
+          },
+          "anonymousPullEnabled": {
+            "value": false
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "18016830013739886874"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the Azure Container Registry (ACR). Must be 5-50 characters and alphanumeric only."
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the registry will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the registry"
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "Basic",
+              "allowedValues": [
+                "Basic",
+                "Standard",
+                "Premium"
+              ],
+              "metadata": {
+                "description": "The SKU name for the registry"
+              }
+            },
+            "adminUserEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "When true, enables the admin user (username/password). Defaults to false for Entra ID authentication."
+              }
+            },
+            "publicNetworkAccess": {
+              "type": "string",
+              "defaultValue": "Enabled",
+              "allowedValues": [
+                "Enabled",
+                "Disabled"
+              ],
+              "metadata": {
+                "description": "Public network access setting"
+              }
+            },
+            "anonymousPullEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "When true, allows anonymous pull access. Defaults to false."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2023-11-01-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('skuName')]"
+              },
+              "properties": {
+                "adminUserEnabled": "[parameters('adminUserEnabled')]",
+                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
+                "networkRuleBypassOptions": "AzureServices",
+                "policies": {
+                  "anonymousPullEnabled": "[parameters('anonymousPullEnabled')]"
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the registry"
+              },
+              "value": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the registry"
+              },
+              "value": "[parameters('name')]"
+            },
+            "loginServer": {
+              "type": "string",
+              "metadata": {
+                "description": "The login server hostname of the registry"
+              },
+              "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('name')), '2023-11-01-preview').loginServer]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "userAssignedIdentity": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-uami-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('uamiName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
           },
           "tags": {
             "value": "[parameters('tags')]"
@@ -698,87 +653,88 @@
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "5780734512434141150"
+              "templateHash": "18350230912836153091"
             }
           },
           "parameters": {
             "name": {
               "type": "string",
-              "minLength": 1,
-              "maxLength": 260,
+              "minLength": 3,
+              "maxLength": 128,
               "metadata": {
-                "description": "The name of the Application Insights component"
+                "description": "The name of the User Assigned Managed Identity"
               }
             },
             "location": {
               "type": "string",
               "metadata": {
-                "description": "The Azure region where the Application Insights component will be created"
-              }
-            },
-            "workspaceResourceId": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The resource ID of the Log Analytics workspace used for workspace-based ingestion"
+                "description": "The Azure region where the User Assigned Managed Identity will be created"
               }
             },
             "tags": {
               "type": "object",
               "defaultValue": {},
               "metadata": {
-                "description": "Tags applied to the Application Insights component"
+                "description": "Tags applied to the User Assigned Managed Identity"
               }
             }
           },
           "resources": [
             {
-              "type": "Microsoft.Insights/components",
-              "apiVersion": "2020-02-02",
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2024-11-30",
               "name": "[parameters('name')]",
               "location": "[parameters('location')]",
-              "kind": "web",
-              "tags": "[parameters('tags')]",
-              "properties": {
-                "Application_Type": "web",
-                "WorkspaceResourceId": "[parameters('workspaceResourceId')]"
-              }
+              "tags": "[parameters('tags')]"
             }
           ],
           "outputs": {
             "id": {
               "type": "string",
               "metadata": {
-                "description": "The resource ID of the Application Insights component"
+                "description": "The resource ID of the User Assigned Managed Identity"
               },
-              "value": "[resourceId('Microsoft.Insights/components', parameters('name'))]"
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name'))]"
             },
             "name": {
               "type": "string",
               "metadata": {
-                "description": "The name of the Application Insights component"
+                "description": "The name of the User Assigned Managed Identity"
               },
               "value": "[parameters('name')]"
             },
-            "connectionString": {
+            "principalId": {
               "type": "string",
               "metadata": {
-                "description": "The connection string of the Application Insights component"
+                "description": "The principal ID of the User Assigned Managed Identity (used for role assignments)"
               },
-              "value": "[reference(resourceId('Microsoft.Insights/components', parameters('name')), '2020-02-02').ConnectionString]"
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').principalId]"
+            },
+            "clientId": {
+              "type": "string",
+              "metadata": {
+                "description": "The client ID of the User Assigned Managed Identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').clientId]"
+            },
+            "tenantId": {
+              "type": "string",
+              "metadata": {
+                "description": "The tenant ID of the User Assigned Managed Identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').tenantId]"
             }
           }
         }
       },
       "dependsOn": [
-        "logAnalyticsWorkspace"
+        "resourceGroup"
       ]
     },
-    "foundryDiagnosticSettings": {
-      "condition": "[parameters('enableObservability')]",
+    "containerAppEnvironment": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-diag-deployment', parameters('name')), 64)]",
+      "name": "[take(format('{0}-cae-deployment', parameters('name')), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -787,241 +743,19 @@
         "mode": "Incremental",
         "parameters": {
           "name": {
-            "value": "[variables('foundryDiagnosticSettingsName')]"
-          },
-          "workspaceResourceId": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
-          },
-          "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
-          }
-        },
-        "template": {
-          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-          "contentVersion": "1.0.0.0",
-          "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.42.1.51946",
-              "templateHash": "11382761312679724490"
-            }
-          },
-          "parameters": {
-            "name": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 256,
-              "metadata": {
-                "description": "The name of the diagnostic settings resource"
-              }
-            },
-            "workspaceResourceId": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The resource ID of the Log Analytics workspace destination"
-              }
-            },
-            "targetAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to. Provide either this or targetServerName."
-              }
-            },
-            "targetServerName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "The name of the existing Azure Database for PostgreSQL Flexible Server that diagnostic settings will be applied to. Provide either this or targetAccountName."
-              }
-            },
-            "targetStorageAccountName": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "The name of the existing Azure Storage Account that diagnostic settings will be applied to. When set, diagnostic settings are created at the storage sub-service scopes (blob/queue/table/file)."
-              }
-            },
-            "storageServices": {
-              "type": "array",
-              "defaultValue": [
-                "blob",
-                "queue",
-                "table",
-                "file"
-              ],
-              "metadata": {
-                "description": "The storage sub-services to configure diagnostic settings for when targetStorageAccountName is set."
-              }
-            },
-            "logs": {
-              "type": "array",
-              "defaultValue": [
-                {
-                  "categoryGroup": "allLogs",
-                  "enabled": true
-                }
-              ],
-              "metadata": {
-                "description": "The diagnostic log settings to configure"
-              }
-            },
-            "metrics": {
-              "type": "array",
-              "defaultValue": [
-                {
-                  "category": "AllMetrics",
-                  "enabled": true
-                }
-              ],
-              "metadata": {
-                "description": "The diagnostic metric settings to configure"
-              }
-            }
-          },
-          "variables": {
-            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
-            "useServerTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetServerName'))))]",
-            "useAccountTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useServerTarget'))), not(empty(parameters('targetAccountName'))))]",
-            "storageDiagnosticSettingIds": "[concat(if(contains(parameters('storageServices'), 'blob'), createArray(coalesce(if(and(variables('useStorageTarget'), contains(parameters('storageServices'), 'blob')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/blobServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), '')), createArray()), if(contains(parameters('storageServices'), 'queue'), createArray(coalesce(if(and(variables('useStorageTarget'), contains(parameters('storageServices'), 'queue')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/queueServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), '')), createArray()), if(contains(parameters('storageServices'), 'table'), createArray(coalesce(if(and(variables('useStorageTarget'), contains(parameters('storageServices'), 'table')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/tableServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), '')), createArray()), if(contains(parameters('storageServices'), 'file'), createArray(coalesce(if(and(variables('useStorageTarget'), contains(parameters('storageServices'), 'file')), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts/fileServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default'), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), '')), createArray()))]",
-            "storageDiagnosticSettingId": "[if(greater(length(variables('storageDiagnosticSettingIds')), 0), variables('storageDiagnosticSettingIds')[0], '')]"
-          },
-          "resources": [
-            {
-              "condition": "[variables('useAccountTarget')]",
-              "type": "Microsoft.Insights/diagnosticSettings",
-              "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
-              "name": "[parameters('name')]",
-              "properties": {
-                "workspaceId": "[parameters('workspaceResourceId')]",
-                "logs": "[parameters('logs')]",
-                "metrics": "[parameters('metrics')]"
-              }
-            },
-            {
-              "condition": "[variables('useServerTarget')]",
-              "type": "Microsoft.Insights/diagnosticSettings",
-              "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder'))]",
-              "name": "[parameters('name')]",
-              "properties": {
-                "workspaceId": "[parameters('workspaceResourceId')]",
-                "logs": "[parameters('logs')]",
-                "metrics": "[parameters('metrics')]"
-              }
-            },
-            {
-              "condition": "[and(variables('useStorageTarget'), contains(parameters('storageServices'), 'blob'))]",
-              "type": "Microsoft.Insights/diagnosticSettings",
-              "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts/blobServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
-              "name": "[parameters('name')]",
-              "properties": {
-                "workspaceId": "[parameters('workspaceResourceId')]",
-                "logs": "[parameters('logs')]",
-                "metrics": "[parameters('metrics')]"
-              }
-            },
-            {
-              "condition": "[and(variables('useStorageTarget'), contains(parameters('storageServices'), 'queue'))]",
-              "type": "Microsoft.Insights/diagnosticSettings",
-              "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts/queueServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
-              "name": "[parameters('name')]",
-              "properties": {
-                "workspaceId": "[parameters('workspaceResourceId')]",
-                "logs": "[parameters('logs')]",
-                "metrics": "[parameters('metrics')]"
-              }
-            },
-            {
-              "condition": "[and(variables('useStorageTarget'), contains(parameters('storageServices'), 'table'))]",
-              "type": "Microsoft.Insights/diagnosticSettings",
-              "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts/tableServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
-              "name": "[parameters('name')]",
-              "properties": {
-                "workspaceId": "[parameters('workspaceResourceId')]",
-                "logs": "[parameters('logs')]",
-                "metrics": "[parameters('metrics')]"
-              }
-            },
-            {
-              "condition": "[and(variables('useStorageTarget'), contains(parameters('storageServices'), 'file'))]",
-              "type": "Microsoft.Insights/diagnosticSettings",
-              "apiVersion": "2021-05-01-preview",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts/fileServices', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'), 'default')]",
-              "name": "[parameters('name')]",
-              "properties": {
-                "workspaceId": "[parameters('workspaceResourceId')]",
-                "logs": "[parameters('logs')]",
-                "metrics": "[parameters('metrics')]"
-              }
-            }
-          ],
-          "outputs": {
-            "id": {
-              "type": "string",
-              "metadata": {
-                "description": "The resource ID of the diagnostic settings resource"
-              },
-              "value": "[coalesce(coalesce(coalesce(if(variables('useServerTarget'), extensionResourceId(resourceId('Microsoft.DBforPostgreSQL/flexibleServers', if(not(empty(parameters('targetServerName'))), parameters('targetServerName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Insights/diagnosticSettings', parameters('name')), null())), variables('storageDiagnosticSettingId')), '')]"
-            },
-            "name": {
-              "type": "string",
-              "metadata": {
-                "description": "The name of the diagnostic settings resource"
-              },
-              "value": "[coalesce(coalesce(if(variables('useServerTarget'), parameters('name'), null()), if(variables('useAccountTarget'), parameters('name'), null())), parameters('name'))]"
-            }
-          }
-        }
-      },
-      "dependsOn": [
-        "foundryAccount",
-        "logAnalyticsWorkspace"
-      ]
-    },
-    "foundryAppInsightsConnection": {
-      "condition": "[parameters('enableObservability')]",
-      "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-appinsights-connection-deployment', parameters('name')), 64)]",
-      "resourceGroup": "[variables('resourceGroupName')]",
-      "properties": {
-        "expressionEvaluationOptions": {
-          "scope": "inner"
-        },
-        "mode": "Incremental",
-        "parameters": {
-          "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
-          },
-          "name": {
-            "value": "[variables('foundryAppInsightsConnectionName')]"
-          },
-          "parentProjectName": {
-            "value": "[variables('foundryProjectName')]"
-          },
-          "category": {
-            "value": "AppInsights"
-          },
-          "target": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
-          },
-          "credentialKey": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'connectionString', 'value'), '')]"
-          },
-          "resourceId": {
-            "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
+            "value": "[variables('containerAppEnvironmentName')]"
           },
           "location": {
             "value": "[parameters('location')]"
           },
-          "isSharedToAll": {
-            "value": false
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "logAnalyticsWorkspaceCustomerId": {
+            "value": "[reference('logAnalyticsWorkspaceResource').customerId]"
+          },
+          "logAnalyticsWorkspaceSharedKey": {
+            "value": "[listKeys(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, variables('resourceGroupName')), 'Microsoft.OperationalInsights/workspaces', variables('logAnalyticsWorkspaceName')), '2023-09-01').primarySharedKey]"
           }
         },
         "template": {
@@ -1031,117 +765,113 @@
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "11421745627715216901"
+              "templateHash": "8919697986413535686"
             }
           },
           "parameters": {
-            "parentAccountName": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 59,
-              "metadata": {
-                "description": "The name of the parent Azure AI Foundry account"
-              }
-            },
-            "parentProjectName": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The name of the parent Azure AI Foundry project"
-              }
-            },
             "name": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 64,
+              "maxLength": 32,
               "metadata": {
-                "description": "The name of the connection resource"
-              }
-            },
-            "category": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The connection category for the Foundry project"
-              }
-            },
-            "target": {
-              "type": "string",
-              "minLength": 1,
-              "metadata": {
-                "description": "The target endpoint or resource ID for the connection"
-              }
-            },
-            "credentialKey": {
-              "type": "securestring",
-              "defaultValue": "",
-              "metadata": {
-                "description": "Optional credential key used for ApiKey-based connections"
+                "description": "The name of the Container Apps environment"
               }
             },
             "location": {
               "type": "string",
               "metadata": {
-                "description": "The Azure region of the connected resource"
+                "description": "The Azure region where the Container Apps environment will be created"
               }
             },
-            "resourceId": {
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Container Apps environment"
+              }
+            },
+            "logAnalyticsWorkspaceCustomerId": {
               "type": "string",
               "minLength": 1,
               "metadata": {
-                "description": "The Azure resource ID of the connected resource"
+                "description": "Log Analytics workspace customer ID (GUID)"
               }
             },
-            "isSharedToAll": {
+            "logAnalyticsWorkspaceSharedKey": {
+              "type": "securestring",
+              "minLength": 1,
+              "metadata": {
+                "description": "Log Analytics workspace shared key. Required for environment creation."
+              }
+            },
+            "zoneRedundant": {
               "type": "bool",
               "defaultValue": false,
               "metadata": {
-                "description": "Whether the connection is shared to all resources in the project"
+                "description": "When true, enables zone redundancy (region dependent)"
               }
             }
           },
           "resources": [
             {
-              "type": "Microsoft.CognitiveServices/accounts/projects/connections",
-              "apiVersion": "2025-12-01",
-              "name": "[format('{0}/{1}/{2}', parameters('parentAccountName'), parameters('parentProjectName'), parameters('name'))]",
-              "properties": "[shallowMerge(createArray(createObject('authType', 'ApiKey', 'category', parameters('category'), 'target', parameters('target')), if(empty(parameters('credentialKey')), createObject(), createObject('credentials', createObject('key', parameters('credentialKey')))), createObject('isSharedToAll', parameters('isSharedToAll'), 'metadata', createObject('ApiType', 'Azure', 'ResourceId', parameters('resourceId'), 'location', parameters('location')))))]"
+              "type": "Microsoft.App/managedEnvironments",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "zoneRedundant": "[parameters('zoneRedundant')]",
+                "appLogsConfiguration": {
+                  "destination": "log-analytics",
+                  "logAnalyticsConfiguration": {
+                    "customerId": "[parameters('logAnalyticsWorkspaceCustomerId')]",
+                    "sharedKey": "[parameters('logAnalyticsWorkspaceSharedKey')]"
+                  }
+                }
+              }
             }
           ],
           "outputs": {
             "id": {
               "type": "string",
               "metadata": {
-                "description": "The resource ID of the Foundry project connection"
+                "description": "The resource ID of the Container Apps environment"
               },
-              "value": "[resourceId('Microsoft.CognitiveServices/accounts/projects/connections', parameters('parentAccountName'), parameters('parentProjectName'), parameters('name'))]"
+              "value": "[resourceId('Microsoft.App/managedEnvironments', parameters('name'))]"
             },
             "name": {
               "type": "string",
               "metadata": {
-                "description": "The name of the Foundry project connection"
+                "description": "The name of the Container Apps environment"
               },
               "value": "[parameters('name')]"
+            },
+            "defaultDomain": {
+              "type": "string",
+              "metadata": {
+                "description": "The default domain assigned to this environment"
+              },
+              "value": "[reference(resourceId('Microsoft.App/managedEnvironments', parameters('name')), '2024-03-01').defaultDomain]"
+            },
+            "staticIp": {
+              "type": "string",
+              "metadata": {
+                "description": "The static IP address of this environment (empty when not assigned)"
+              },
+              "value": "[coalesce(tryGet(reference(resourceId('Microsoft.App/managedEnvironments', parameters('name')), '2024-03-01'), 'staticIp'), '')]"
             }
           }
         }
       },
       "dependsOn": [
-        "applicationInsights",
-        "foundryProject"
+        "logAnalyticsWorkspace",
+        "logAnalyticsWorkspaceResource"
       ]
     },
-    "modelDeployments": {
-      "copy": {
-        "name": "modelDeployments",
-        "count": "[length(parameters('models'))]",
-        "mode": "serial",
-        "batchSize": 1
-      },
+    "containerApp": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-model-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "name": "[take(format('{0}-ca-deployment', parameters('name')), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1149,156 +879,415 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "parentAccountName": {
-            "value": "[variables('foundryAccountName')]"
-          },
           "name": {
-            "value": "[parameters('models')[copyIndex()].name]"
+            "value": "[variables('containerAppName')]"
           },
-          "modelName": {
-            "value": "[parameters('models')[copyIndex()].modelName]"
+          "location": {
+            "value": "[parameters('location')]"
           },
-          "modelVersion": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelVersion'), ''))]"
+          "tags": {
+            "value": "[parameters('tags')]"
           },
-          "modelFormat": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'modelFormat'), 'OpenAI'))]"
+          "environmentId": {
+            "value": "[reference('containerAppEnvironment').outputs.id.value]"
           },
-          "skuName": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'skuName'), 'GlobalStandard'))]"
+          "userAssignedIdentityResourceIds": {
+            "value": "[concat(createArray(reference('userAssignedIdentity').outputs.id.value), variables('existingUamiResourceIds'))]"
           },
-          "skuCapacity": {
-            "value": "[int(coalesce(tryGet(parameters('models')[copyIndex()], 'skuCapacity'), 50))]"
+          "enableSystemAssignedIdentity": {
+            "value": true
           },
-          "raiPolicyName": {
-            "value": "[string(coalesce(tryGet(parameters('models')[copyIndex()], 'raiPolicyName'), ''))]"
+          "containerImage": {
+            "value": "[parameters('containerImage')]"
+          },
+          "containerName": {
+            "value": "app"
+          },
+          "containerCommand": {
+            "value": "[parameters('containerCommand')]"
+          },
+          "containerArgs": {
+            "value": "[parameters('containerArgs')]"
+          },
+          "cpu": {
+            "value": "[parameters('cpu')]"
+          },
+          "memory": {
+            "value": "[parameters('memory')]"
+          },
+          "minReplicas": {
+            "value": "[parameters('minReplicas')]"
+          },
+          "maxReplicas": {
+            "value": "[parameters('maxReplicas')]"
+          },
+          "targetPort": {
+            "value": "[parameters('targetPort')]"
+          },
+          "ingressExternal": {
+            "value": "[parameters('ingressExternal')]"
+          },
+          "registries": {
+            "value": [
+              {
+                "server": "[reference('containerRegistry').outputs.loginServer.value]",
+                "identity": "[reference('userAssignedIdentity').outputs.id.value]"
+              }
+            ]
+          },
+          "enableEasyAuth": {
+            "value": "[parameters('enableEasyAuth')]"
+          },
+          "easyAuthRequireAuthentication": {
+            "value": "[parameters('easyAuthRequireAuthentication')]"
+          },
+          "easyAuthEntraClientId": {
+            "value": "[parameters('easyAuthEntraClientId')]"
+          },
+          "easyAuthAllowedAudiences": {
+            "value": "[parameters('easyAuthAllowedAudiences')]"
           }
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
           "contentVersion": "1.0.0.0",
           "metadata": {
             "_generator": {
               "name": "bicep",
               "version": "0.42.1.51946",
-              "templateHash": "5558730159430887017"
+              "templateHash": "16427095919591796764"
             }
           },
           "parameters": {
-            "parentAccountName": {
-              "type": "string",
-              "minLength": 2,
-              "maxLength": 59,
-              "metadata": {
-                "description": "The name of the parent Azure AI Foundry account"
-              }
-            },
             "name": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 64,
-              "metadata": {
-                "description": "The name of the model deployment"
-              }
-            },
-            "modelName": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128,
-              "metadata": {
-                "description": "The model name to deploy"
-              }
-            },
-            "modelVersion": {
-              "type": "string",
-              "defaultValue": "",
-              "metadata": {
-                "description": "The model version to deploy (optional)"
-              }
-            },
-            "modelFormat": {
-              "type": "string",
-              "defaultValue": "OpenAI",
-              "minLength": 1,
               "maxLength": 32,
               "metadata": {
-                "description": "The model format to deploy"
+                "description": "The name of the Container App"
               }
             },
-            "skuName": {
+            "location": {
               "type": "string",
-              "defaultValue": "GlobalStandard",
+              "metadata": {
+                "description": "The Azure region where the Container App will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Container App"
+              }
+            },
+            "environmentId": {
+              "type": "string",
               "minLength": 1,
-              "maxLength": 64,
               "metadata": {
-                "description": "The SKU name for the model deployment"
+                "description": "The resource ID of the target Container Apps environment"
               }
             },
-            "skuCapacity": {
+            "userAssignedIdentityResourceIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Optional. Resource IDs of User Assigned Managed Identities (UAMI) to attach. Defaults to empty array."
+              }
+            },
+            "enableSystemAssignedIdentity": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "When true, enables System Assigned Managed Identity"
+              }
+            },
+            "containerImage": {
+              "type": "string",
+              "defaultValue": "nginx:latest",
+              "metadata": {
+                "description": "Container image to run"
+              }
+            },
+            "containerName": {
+              "type": "string",
+              "defaultValue": "app",
+              "metadata": {
+                "description": "Container name within the app"
+              }
+            },
+            "containerCommand": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Optional. Override container command"
+              }
+            },
+            "containerArgs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Optional. Override container args"
+              }
+            },
+            "containerEnv": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Container environment variables. Each element is `{ name, value }` or `{ name, secretRef }`."
+              }
+            },
+            "cpu": {
+              "type": "string",
+              "defaultValue": "0.5",
+              "metadata": {
+                "description": "CPU allocation (vCPU). Example: 0.5"
+              }
+            },
+            "memory": {
+              "type": "string",
+              "defaultValue": "1Gi",
+              "metadata": {
+                "description": "Memory allocation. Example: 1Gi"
+              }
+            },
+            "minReplicas": {
               "type": "int",
-              "defaultValue": 50,
-              "minValue": 1,
+              "defaultValue": 0,
               "metadata": {
-                "description": "The SKU capacity for the model deployment"
+                "description": "Minimum replicas"
               }
             },
-            "raiPolicyName": {
+            "maxReplicas": {
+              "type": "int",
+              "defaultValue": 3,
+              "metadata": {
+                "description": "Maximum replicas"
+              }
+            },
+            "targetPort": {
+              "type": "int",
+              "defaultValue": 80,
+              "metadata": {
+                "description": "Ingress target port"
+              }
+            },
+            "ingressExternal": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "When true, enables external HTTPS ingress"
+              }
+            },
+            "transport": {
+              "type": "string",
+              "defaultValue": "auto",
+              "allowedValues": [
+                "auto",
+                "http",
+                "http2",
+                "tcp"
+              ],
+              "metadata": {
+                "description": "Ingress transport protocol"
+              }
+            },
+            "registries": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Registries configuration. Each element is `{ server, identity }` where `identity` is a UAMI resource ID used for Entra ID-based pulls."
+              }
+            },
+            "secrets": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Secrets configuration for the Container App"
+              }
+            },
+            "enableEasyAuth": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "When true, enables Easy Auth (built-in authentication) with Microsoft Entra ID"
+              }
+            },
+            "easyAuthRequireAuthentication": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "When Easy Auth is enabled, require authentication (redirect unauthenticated clients to login)"
+              }
+            },
+            "easyAuthEntraClientId": {
               "type": "string",
               "defaultValue": "",
               "metadata": {
-                "description": "The Responsible AI policy name (optional)"
+                "description": "Client ID of the Entra ID app registration (required when Easy Auth is enabled)"
+              }
+            },
+            "easyAuthEntraOpenIdIssuer": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "OpenID issuer URL. When empty, derives `https://login.microsoftonline.com/<tenantId>/v2.0`."
+              }
+            },
+            "easyAuthAllowedAudiences": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Allowed audiences for Easy Auth token validation"
               }
             }
           },
-          "resources": [
-            {
-              "type": "Microsoft.CognitiveServices/accounts/deployments",
-              "apiVersion": "2025-06-01",
-              "name": "[format('{0}/{1}', parameters('parentAccountName'), parameters('name'))]",
-              "sku": {
-                "name": "[parameters('skuName')]",
-                "capacity": "[parameters('skuCapacity')]"
+          "variables": {
+            "userAssignedIdentitiesObject": "[reduce(parameters('userAssignedIdentityResourceIds'), createObject(), lambda('current', 'id', union(lambdaVariables('current'), createObject(format('{0}', lambdaVariables('id')), createObject()))))]",
+            "identityType": "[if(parameters('enableSystemAssignedIdentity'), if(greater(length(parameters('userAssignedIdentityResourceIds')), 0), 'SystemAssigned, UserAssigned', 'SystemAssigned'), if(greater(length(parameters('userAssignedIdentityResourceIds')), 0), 'UserAssigned', 'None'))]",
+            "easyAuthOpenIdIssuerResolved": "[if(empty(parameters('easyAuthEntraOpenIdIssuer')), format('{0}{1}/v2.0', environment().authentication.loginEndpoint, subscription().tenantId), parameters('easyAuthEntraOpenIdIssuer'))]",
+            "unauthenticatedClientAction": "[if(parameters('easyAuthRequireAuthentication'), 'RedirectToLoginPage', 'AllowAnonymous')]"
+          },
+          "resources": {
+            "containerApp": {
+              "type": "Microsoft.App/containerApps",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "identity": "[if(equals(variables('identityType'), 'None'), null(), createObject('type', variables('identityType'), 'userAssignedIdentities', if(greater(length(parameters('userAssignedIdentityResourceIds')), 0), variables('userAssignedIdentitiesObject'), null())))]",
+              "properties": {
+                "managedEnvironmentId": "[parameters('environmentId')]",
+                "configuration": {
+                  "activeRevisionsMode": "Single",
+                  "secrets": "[parameters('secrets')]",
+                  "registries": "[parameters('registries')]",
+                  "ingress": {
+                    "external": "[parameters('ingressExternal')]",
+                    "targetPort": "[parameters('targetPort')]",
+                    "transport": "[parameters('transport')]",
+                    "allowInsecure": false,
+                    "traffic": [
+                      {
+                        "latestRevision": true,
+                        "weight": 100
+                      }
+                    ]
+                  }
+                },
+                "template": {
+                  "containers": [
+                    {
+                      "name": "[parameters('containerName')]",
+                      "image": "[parameters('containerImage')]",
+                      "command": "[parameters('containerCommand')]",
+                      "args": "[parameters('containerArgs')]",
+                      "env": "[parameters('containerEnv')]",
+                      "resources": {
+                        "cpu": "[json(parameters('cpu'))]",
+                        "memory": "[parameters('memory')]"
+                      }
+                    }
+                  ],
+                  "scale": {
+                    "minReplicas": "[parameters('minReplicas')]",
+                    "maxReplicas": "[parameters('maxReplicas')]"
+                  }
+                }
+              }
+            },
+            "authConfig": {
+              "condition": "[parameters('enableEasyAuth')]",
+              "type": "Microsoft.App/containerApps/authConfigs",
+              "apiVersion": "2024-03-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'current')]",
+              "properties": {
+                "platform": {
+                  "enabled": true
+                },
+                "globalValidation": {
+                  "unauthenticatedClientAction": "[variables('unauthenticatedClientAction')]",
+                  "redirectToProvider": "azureactivedirectory"
+                },
+                "identityProviders": {
+                  "azureActiveDirectory": {
+                    "enabled": true,
+                    "registration": {
+                      "clientId": "[parameters('easyAuthEntraClientId')]",
+                      "openIdIssuer": "[variables('easyAuthOpenIdIssuerResolved')]"
+                    },
+                    "validation": {
+                      "allowedAudiences": "[parameters('easyAuthAllowedAudiences')]"
+                    }
+                  }
+                }
               },
-              "properties": "[shallowMerge(createArray(createObject('model', shallowMerge(createArray(createObject('format', parameters('modelFormat'), 'name', parameters('modelName')), if(empty(parameters('modelVersion')), createObject(), createObject('version', parameters('modelVersion')))))), if(empty(parameters('raiPolicyName')), createObject(), createObject('raiPolicyName', parameters('raiPolicyName')))))]"
+              "dependsOn": [
+                "containerApp"
+              ]
             }
-          ],
+          },
           "outputs": {
             "id": {
               "type": "string",
               "metadata": {
-                "description": "The resource ID of the model deployment"
+                "description": "The resource ID of the Container App"
               },
-              "value": "[resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name'))]"
+              "value": "[resourceId('Microsoft.App/containerApps', parameters('name'))]"
             },
             "name": {
               "type": "string",
               "metadata": {
-                "description": "The name of the model deployment"
+                "description": "The name of the Container App"
               },
               "value": "[parameters('name')]"
             },
-            "provisioningState": {
+            "fqdn": {
               "type": "string",
               "metadata": {
-                "description": "The provisioning state of the model deployment"
+                "description": "The fully qualified domain name (FQDN) of the Container App"
               },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('parentAccountName'), parameters('name')), '2025-06-01').provisioningState]"
+              "value": "[reference('containerApp').configuration.ingress.fqdn]"
+            },
+            "latestRevisionName": {
+              "type": "string",
+              "metadata": {
+                "description": "The latest revision name of the Container App"
+              },
+              "value": "[reference('containerApp').latestRevisionName]"
+            },
+            "systemAssignedPrincipalId": {
+              "type": "string",
+              "metadata": {
+                "description": "The system-assigned managed identity principal ID (empty when disabled)"
+              },
+              "value": "[coalesce(tryGet(reference('containerApp', '2024-03-01', 'full').identity, 'principalId'), '')]"
             }
           }
         }
       },
       "dependsOn": [
-        "foundryProject"
+        "containerAppEnvironment",
+        "containerRegistry",
+        "userAssignedIdentity"
       ]
     },
-    "uamiRoleAssignments": {
-      "copy": {
-        "name": "uamiRoleAssignments",
-        "count": "[length(variables('uamiRolePairs'))]"
-      },
+    "acrPullRoleAssignment": {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
-      "name": "[take(format('{0}-uami-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "name": "[take(format('{0}-acr-pull-role-deployment', parameters('name')), 64)]",
       "resourceGroup": "[variables('resourceGroupName')]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -1306,17 +1295,17 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+          "targetRegistryName": {
+            "value": "[variables('acrName')]"
           },
           "principalId": {
-            "value": "[reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId]"
+            "value": "[reference('userAssignedIdentity').outputs.principalId.value]"
           },
           "roleDefinitionId": {
-            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleDefinitionGuid'))]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference('containerRegistry').outputs.id.value, reference('userAssignedIdentity').outputs.principalId.value, variables('acrPullRoleDefinitionGuid'))]"
           },
           "principalType": {
             "value": "ServicePrincipal"
@@ -1482,7 +1471,202 @@
         }
       },
       "dependsOn": [
-        "foundryAccount",
+        "containerRegistry",
+        "userAssignedIdentity"
+      ]
+    },
+    "uamiRoleAssignments": {
+      "copy": {
+        "name": "uamiRoleAssignments",
+        "count": "[length(variables('uamiRolePairs'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-uami-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetContainerAppName": {
+            "value": "[variables('containerAppName')]"
+          },
+          "principalId": {
+            "value": "[reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference('containerApp').outputs.id.value, reference(format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "18419871747845986751"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this or targetStorageAccountName."
+              }
+            },
+            "targetStorageAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 24,
+              "metadata": {
+                "description": "The name of the target Azure Storage Account resource. Provide either this or targetAccountName."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the target Azure Container Registry (ACR) resource. Provide either this or one of the other target*Name parameters."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the target Azure Container App resource. Provide either this or one of the other target*Name parameters."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "useContainerAppTarget": "[not(empty(parameters('targetContainerAppName')))]",
+            "useRegistryTarget": "[and(not(variables('useContainerAppTarget')), not(empty(parameters('targetRegistryName'))))]",
+            "useStorageTarget": "[and(and(not(variables('useContainerAppTarget')), not(variables('useRegistryTarget'))), not(empty(parameters('targetStorageAccountName'))))]",
+            "useAccountTarget": "[and(and(and(not(variables('useContainerAppTarget')), not(variables('useRegistryTarget'))), not(variables('useStorageTarget'))), not(empty(parameters('targetAccountName'))))]",
+            "roleAssignmentScopeName": "[if(variables('useContainerAppTarget'), parameters('targetContainerAppName'), if(variables('useRegistryTarget'), parameters('targetRegistryName'), if(variables('useStorageTarget'), parameters('targetStorageAccountName'), parameters('targetAccountName'))))]",
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(variables('roleAssignmentScopeName'), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "condition": "[variables('useAccountTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useStorageTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useRegistryTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useContainerAppTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useContainerAppTarget'), extensionResourceId(resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useRegistryTarget'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useContainerAppTarget'), variables('roleAssignmentName'), null()), if(variables('useRegistryTarget'), variables('roleAssignmentName'), null())), if(variables('useStorageTarget'), variables('roleAssignmentName'), null())), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "containerApp",
         "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]",
         "[format('uamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]"
       ]
@@ -1502,8 +1686,8 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+          "targetContainerAppName": {
+            "value": "[variables('containerAppName')]"
           },
           "principalId": {
             "value": "[variables('servicePrincipalRolePairs')[copyIndex()].principalId]"
@@ -1512,7 +1696,7 @@
             "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference('containerApp').outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "principalType": {
             "value": "ServicePrincipal"
@@ -1678,7 +1862,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount"
+        "containerApp"
       ]
     },
     "userRoleAssignments": {
@@ -1696,8 +1880,8 @@
         },
         "mode": "Incremental",
         "parameters": {
-          "targetAccountName": {
-            "value": "[variables('foundryAccountName')]"
+          "targetContainerAppName": {
+            "value": "[variables('containerAppName')]"
           },
           "principalId": {
             "value": "[variables('userRolePairs')[copyIndex()].principalId]"
@@ -1706,7 +1890,7 @@
             "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "roleAssignmentNameSeed": {
-            "value": "[guid(reference('foundryAccount').outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
+            "value": "[guid(reference('containerApp').outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
           },
           "principalType": {
             "value": "User"
@@ -1872,7 +2056,7 @@
         }
       },
       "dependsOn": [
-        "foundryAccount"
+        "containerApp"
       ]
     }
   },
@@ -1880,127 +2064,129 @@
     "resourceGroupId": {
       "type": "string",
       "metadata": {
-        "description": "The resource ID of the created resource group"
+        "description": "RG resource ID"
       },
       "value": "[reference('resourceGroup').outputs.id.value]"
     },
     "resourceGroupName": {
       "type": "string",
       "metadata": {
-        "description": "The name of the created resource group"
+        "description": "RG name"
       },
       "value": "[reference('resourceGroup').outputs.name.value]"
     },
-    "resourceGroupLocation": {
+    "containerRegistryId": {
       "type": "string",
       "metadata": {
-        "description": "The location of the created resource group"
+        "description": "ACR resource ID"
       },
-      "value": "[reference('resourceGroup').outputs.location.value]"
+      "value": "[reference('containerRegistry').outputs.id.value]"
     },
-    "foundryAccountId": {
+    "containerRegistryLoginServer": {
       "type": "string",
       "metadata": {
-        "description": "The resource ID of the created Azure AI Foundry account"
+        "description": "ACR loginServer"
       },
-      "value": "[reference('foundryAccount').outputs.id.value]"
+      "value": "[reference('containerRegistry').outputs.loginServer.value]"
     },
-    "foundryAccountName": {
+    "userAssignedIdentityId": {
       "type": "string",
       "metadata": {
-        "description": "The name of the created Azure AI Foundry account"
+        "description": "Resource ID of the created UAMI"
       },
-      "value": "[reference('foundryAccount').outputs.name.value]"
+      "value": "[reference('userAssignedIdentity').outputs.id.value]"
     },
-    "foundryEndpoint": {
+    "userAssignedIdentityPrincipalId": {
       "type": "string",
       "metadata": {
-        "description": "The endpoint of the created Azure AI Foundry account"
+        "description": "Principal ID of the created UAMI"
       },
-      "value": "[reference('foundryAccount').outputs.endpoint.value]"
+      "value": "[reference('userAssignedIdentity').outputs.principalId.value]"
     },
-    "foundryProjectId": {
+    "userAssignedIdentityClientId": {
       "type": "string",
       "metadata": {
-        "description": "The resource ID of the created Azure AI Foundry project"
+        "description": "Client ID of the created UAMI"
       },
-      "value": "[reference('foundryProject').outputs.id.value]"
-    },
-    "foundryProjectName": {
-      "type": "string",
-      "metadata": {
-        "description": "The name of the created Azure AI Foundry project"
-      },
-      "value": "[reference('foundryProject').outputs.name.value]"
-    },
-    "deployedModelNames": {
-      "type": "array",
-      "metadata": {
-        "description": "The names of model deployments requested by this scenario"
-      },
-      "copy": {
-        "count": "[length(parameters('models'))]",
-        "input": "[parameters('models')[copyIndex()].name]"
-      }
+      "value": "[reference('userAssignedIdentity').outputs.clientId.value]"
     },
     "logAnalyticsWorkspaceId": {
       "type": "string",
       "metadata": {
-        "description": "The resource ID of the created Log Analytics workspace (empty when observability is disabled)"
+        "description": "Log Analytics resource ID"
       },
-      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('logAnalyticsWorkspace'), null()), 'outputs', 'id', 'value'), '')]"
+      "value": "[reference('logAnalyticsWorkspace').outputs.id.value]"
     },
-    "applicationInsightsId": {
+    "containerAppEnvironmentId": {
       "type": "string",
       "metadata": {
-        "description": "The resource ID of the created Application Insights component (empty when observability is disabled)"
+        "description": "Container Apps Environment resource ID"
       },
-      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'id', 'value'), '')]"
+      "value": "[reference('containerAppEnvironment').outputs.id.value]"
     },
-    "applicationInsightsConnectionString": {
+    "containerAppId": {
       "type": "string",
       "metadata": {
-        "description": "The connection string of the created Application Insights component (empty when observability is disabled)"
+        "description": "Container App resource ID"
       },
-      "value": "[coalesce(tryGet(if(parameters('enableObservability'), reference('applicationInsights'), null()), 'outputs', 'connectionString', 'value'), '')]"
+      "value": "[reference('containerApp').outputs.id.value]"
+    },
+    "containerAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "Container App name"
+      },
+      "value": "[reference('containerApp').outputs.name.value]"
+    },
+    "containerAppFqdn": {
+      "type": "string",
+      "metadata": {
+        "description": "Container App FQDN"
+      },
+      "value": "[reference('containerApp').outputs.fqdn.value]"
+    },
+    "containerAppUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Container App URL for quick verification"
+      },
+      "value": "[format('https://{0}', reference('containerApp').outputs.fqdn.value)]"
+    },
+    "acrPullRoleAssignmentId": {
+      "type": "string",
+      "metadata": {
+        "description": "Role assignment ID of AcrPull granted to the created UAMI at ACR scope"
+      },
+      "value": "[reference('acrPullRoleAssignment').outputs.id.value]"
     },
     "uamiRoleAssignmentIds": {
       "type": "array",
-      "items": {
-        "type": "string"
-      },
       "metadata": {
-        "description": "The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)"
+        "description": "Role assignment IDs granted to the supplied UAMIs (empty when no UAMI is attached)"
       },
       "copy": {
-        "count": "[length(variables('uamiRolePairs'))]",
-        "input": "[reference(format('uamiRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+        "count": "[length(range(0, length(variables('uamiRolePairs'))))]",
+        "input": "[reference(format('uamiRoleAssignments[{0}]', range(0, length(variables('uamiRolePairs')))[copyIndex()])).outputs.id.value]"
       }
     },
     "servicePrincipalRoleAssignmentIds": {
       "type": "array",
-      "items": {
-        "type": "string"
-      },
       "metadata": {
-        "description": "The resource IDs of role assignments granted to every existing service principal (empty when no service principal is attached)"
+        "description": "Role assignment IDs granted to the supplied service principals (empty when no service principal is attached)"
       },
       "copy": {
-        "count": "[length(variables('servicePrincipalRolePairs'))]",
-        "input": "[reference(format('servicePrincipalRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+        "count": "[length(range(0, length(variables('servicePrincipalRolePairs'))))]",
+        "input": "[reference(format('servicePrincipalRoleAssignments[{0}]', range(0, length(variables('servicePrincipalRolePairs')))[copyIndex()])).outputs.id.value]"
       }
     },
     "userRoleAssignmentIds": {
       "type": "array",
-      "items": {
-        "type": "string"
-      },
       "metadata": {
-        "description": "The resource IDs of role assignments granted to every existing user (empty when no user is attached)"
+        "description": "Role assignment IDs granted to the supplied users (empty when no user is attached)"
       },
       "copy": {
-        "count": "[length(variables('userRolePairs'))]",
-        "input": "[reference(format('userRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+        "count": "[length(range(0, length(variables('userRolePairs'))))]",
+        "input": "[reference(format('userRoleAssignments[{0}]', range(0, length(variables('userRolePairs')))[copyIndex()])).outputs.id.value]"
       }
     }
   }
