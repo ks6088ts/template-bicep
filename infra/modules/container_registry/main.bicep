@@ -49,6 +49,8 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-11-01-pr
     adminUserEnabled: adminUserEnabled
     publicNetworkAccess: publicNetworkAccess
     policies: {
+      // BCP037 is suppressed because this preview API supports anonymousPullEnabled under policies,
+      // while the bundled Bicep type definition may lag behind the service contract.
       #disable-next-line BCP037
       anonymousPullEnabled: anonymousPullEnabled
     }
