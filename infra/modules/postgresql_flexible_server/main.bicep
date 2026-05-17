@@ -79,6 +79,13 @@ resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2025-08-01' =
   }
 }
 
+// NOTE: The Entra administrator must be registered while the server is in an
+//       accessible (Ready) state. Other child resources (firewall rules,
+//       databases, configurations) all transition the server to an "Updating"
+//       state and, if executed in parallel, cause the administrator operation
+//       to fail with `AadAuthOperationCannotBePerformedWhenServerIsNotAccessible`.
+//       The dependencies below serialize the child operations so the Entra
+//       administrator is created first, and all other operations follow.
 resource entraAdmin 'Microsoft.DBforPostgreSQL/flexibleServers/administrators@2025-08-01' = {
   parent: postgresServer
   name: entraAdministrator.objectId
@@ -97,6 +104,7 @@ resource firewallRuleResources 'Microsoft.DBforPostgreSQL/flexibleServers/firewa
       startIpAddress: rule.startIpAddress
       endIpAddress: rule.endIpAddress
     }
+    dependsOn: [entraAdmin]
   }
 ]
 
@@ -108,6 +116,7 @@ resource databaseResources 'Microsoft.DBforPostgreSQL/flexibleServers/databases@
       charset: db.?charset ?? 'UTF8'
       collation: db.?collation ?? 'en_US.utf8'
     }
+    dependsOn: [entraAdmin, firewallRuleResources]
   }
 ]
 
@@ -118,6 +127,7 @@ resource pgvectorConfig 'Microsoft.DBforPostgreSQL/flexibleServers/configuration
     value: 'VECTOR'
     source: 'user-override'
   }
+  dependsOn: [entraAdmin, firewallRuleResources, databaseResources]
 }
 
 // ------------------

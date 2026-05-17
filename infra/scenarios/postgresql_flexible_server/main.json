@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "16774599653878297185"
+      "templateHash": "2770698558586096606"
     }
   },
   "parameters": {
@@ -296,7 +296,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "8973053382562019931"
+              "templateHash": "14226052919567474075"
             }
           },
           "parameters": {
@@ -464,6 +464,7 @@
                 "endIpAddress": "[parameters('firewallRules')[copyIndex()].endIpAddress]"
               },
               "dependsOn": [
+                "entraAdmin",
                 "postgresServer"
               ]
             },
@@ -480,6 +481,8 @@
                 "collation": "[coalesce(tryGet(parameters('databases')[copyIndex()], 'collation'), 'en_US.utf8')]"
               },
               "dependsOn": [
+                "entraAdmin",
+                "firewallRuleResources",
                 "postgresServer"
               ]
             },
@@ -493,6 +496,9 @@
                 "source": "user-override"
               },
               "dependsOn": [
+                "databaseResources",
+                "entraAdmin",
+                "firewallRuleResources",
                 "postgresServer"
               ]
             }
