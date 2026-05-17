@@ -3,12 +3,10 @@
 // ------------------
 
 @description('The name of the parent Azure AI Foundry account')
-@minLength(2)
 @maxLength(59)
 param parentAccountName string
 
 @description('The name of the parent Azure AI Foundry project')
-@minLength(2)
 @maxLength(64)
 param parentProjectName string
 
@@ -59,11 +57,13 @@ resource connection 'Microsoft.CognitiveServices/accounts/projects/connections@2
     authType: 'ApiKey'
     category: category
     target: target
-    ...(empty(credentialKey) ? {} : {
-      credentials: {
-        key: credentialKey
-      }
-    })
+    ...(empty(credentialKey)
+      ? {}
+      : {
+          credentials: {
+            key: credentialKey
+          }
+        })
     isSharedToAll: isSharedToAll
     metadata: {
       ApiType: 'Azure'

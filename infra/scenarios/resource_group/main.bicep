@@ -22,7 +22,7 @@ param tags object = {
 //    VARIABLES
 // ------------------
 
-var resourceGroupName = 'rg-${name}'
+var resourceGroupName = 'rg-templatebicep-${name}'
 
 // ------------------
 //    RESOURCES

@@ -3,7 +3,6 @@
 // ------------------
 
 @description('The name of the Application Insights component')
-@minLength(1)
 @maxLength(260)
 param name string
 

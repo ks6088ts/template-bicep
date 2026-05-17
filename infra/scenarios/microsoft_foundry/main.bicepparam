@@ -1,9 +1,6 @@
 using 'main.bicep'
 
-// NOTE: deviates from the scenario folder name because Azure rejects Cognitive Services / AI Foundry
-// account names containing the trademarked word "microsoft" (ReservedResourceName). Underscores are
-// also invalid in Foundry project names, so we use a hyphenated, non-reserved value here.
-param name = 'templatebicepfoundry'
+param name = 'microsoftfoundry'
 param location = 'japaneast'
 param tags = {
   environment: 'dev'
@@ -14,7 +11,6 @@ param tags = {
 
 // Enable API key based authentication on the Foundry account. Set to true to require Entra ID only.
 param disableLocalAuth = false
-
 
 // Optional: enable observability resources (Log Analytics, Application Insights, diagnostic settings,
 // and Foundry project tracing connection). Leave commented out (or set to false) to preserve the

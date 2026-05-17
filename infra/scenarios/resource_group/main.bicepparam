@@ -1,6 +1,6 @@
 using 'main.bicep'
 
-param name = 'resource_group'
+param name = 'resourcegroup'
 param location = 'japaneast'
 param tags = {
   environment: 'dev'

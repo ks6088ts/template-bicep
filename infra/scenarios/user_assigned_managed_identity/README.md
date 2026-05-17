@@ -24,16 +24,17 @@ The scenario layer is responsible for:
 
 ## Parameters
 
-| Parameter                  | Type                          | Default                                  | Description                                                                               |
-| -------------------------- | ----------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `name`                     | `string`                      | _required_                               | Scenario name used to derive the resource group name (`rg-{name}`).                       |
-| `location`                 | `string`                      | _required_                               | Azure region where the resource group and all UAMIs are created.                          |
-| `tags`                     | `object`                      | `{ scenario: name, managedBy: 'bicep' }` | Tags applied to all resources.                                                            |
-| `userAssignedIdentities`   | `userAssignedIdentitySpec[]`  | _required_                               | Array of UAMIs to create. Each entry must have a `name` field (full UAMI resource name). |
+| Parameter                  | Type                          | Default                                  | Description                                                                                              |
+| -------------------------- | ----------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `name`                     | `string`                      | _required_                               | Scenario name used to derive the resource group name (`rg-templatebicep-{name}`) and the default `scenario` tag. |
+| `location`                 | `string`                      | _required_                               | Azure region where the resource group and all UAMIs are created.                                         |
+| `tags`                     | `object`                      | `{ scenario: name, managedBy: 'bicep' }` | Tags applied to all resources.                                                                           |
+| `userAssignedIdentities`   | `userAssignedIdentitySpec[]`  | _required_                               | Array of UAMIs to create. Each entry must have a `name` field (full UAMI resource name).                 |
 
 Resource names are derived as:
-- Resource group: `rg-{name}`
-- User Assigned Managed Identity: as specified by each `userAssignedIdentities[].name` entry
+
+* Resource group: `rg-templatebicep-{name}`
+* User Assigned Managed Identity: as specified by each `userAssignedIdentities[].name` entry
 
 ## Outputs
 

@@ -24,14 +24,14 @@ type userAssignedIdentitySpec = {
   name: string
 }
 
-@description('Array of User Assigned Managed Identities to create in the shared resource group `rg-{name}`. Names must be unique within the array.')
+@description('Array of User Assigned Managed Identities to create in the shared resource group `rg-templatebicep-{name}`. Names must be unique within the array.')
 param userAssignedIdentities userAssignedIdentitySpec[]
 
 // ------------------
 //    VARIABLES
 // ------------------
 
-var resourceGroupName = 'rg-${name}'
+var resourceGroupName = 'rg-templatebicep-${name}'
 
 // ------------------
 //    RESOURCES

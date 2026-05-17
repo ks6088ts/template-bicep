@@ -2,25 +2,25 @@
 //    PARAMETERS
 // ------------------
 
-@description('The name of the diagnostic settings resource')
-@minLength(1)
+@description('The name of the diagnostic settings resource.')
 @maxLength(256)
 param name string
 
-@description('The resource ID of the Log Analytics workspace destination')
-@minLength(1)
+@description('The resource ID of the Log Analytics workspace destination.')
 param workspaceResourceId string
 
-@description('The name of the existing Azure AI Foundry (Cognitive Services) account that diagnostic settings will be applied to. Provide either this or targetServerName.')
-param targetAccountName string = ''
+@description('Kind of the resource that diagnostic settings will be applied to.')
+@allowed([
+  'CognitiveServicesAccount'
+  'PostgreSqlFlexibleServer'
+  'StorageAccount'
+])
+param targetKind string
 
-@description('The name of the existing Azure Database for PostgreSQL Flexible Server that diagnostic settings will be applied to. Provide either this or targetAccountName.')
-param targetServerName string = ''
+@description('Name of the target resource.')
+param targetName string
 
-@description('The name of the existing Azure Storage Account that diagnostic settings will be applied to. When set, diagnostic settings are created at the storage sub-service scopes (blob/queue/table/file).')
-param targetStorageAccountName string = ''
-
-@description('The storage sub-services to configure diagnostic settings for when targetStorageAccountName is set.')
+@description('Storage sub-services to configure diagnostic settings for. Only used when `targetKind` is `StorageAccount`.')
 param storageServices array = [
   'blob'
   'queue'
@@ -28,7 +28,7 @@ param storageServices array = [
   'file'
 ]
 
-@description('The diagnostic log settings to configure')
+@description('Diagnostic log settings to configure.')
 param logs array = [
   {
     categoryGroup: 'allLogs'
@@ -36,7 +36,7 @@ param logs array = [
   }
 ]
 
-@description('The diagnostic metric settings to configure')
+@description('Diagnostic metric settings to configure.')
 param metrics array = [
   {
     category: 'AllMetrics'
@@ -45,45 +45,46 @@ param metrics array = [
 ]
 
 // ------------------
+//    VARIABLES
+// ------------------
+
+var isAccount = targetKind == 'CognitiveServicesAccount'
+var isServer = targetKind == 'PostgreSqlFlexibleServer'
+var isStorage = targetKind == 'StorageAccount'
+
+// ------------------
 //    EXISTING RESOURCES
 // ------------------
 
-var useStorageTarget = !empty(targetStorageAccountName)
-var useServerTarget = !useStorageTarget && !empty(targetServerName)
-var useAccountTarget = !useStorageTarget && !useServerTarget && !empty(targetAccountName)
-
-resource targetAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (useAccountTarget) {
-  #disable-next-line BCP334
-  name: !empty(targetAccountName) ? targetAccountName : 'placeholder'
+resource cognitiveAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (isAccount) {
+  name: targetName
 }
 
-resource targetServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' existing = if (useServerTarget) {
-  #disable-next-line BCP334
-  name: !empty(targetServerName) ? targetServerName : 'placeholder'
+resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' existing = if (isServer) {
+  name: targetName
 }
 
-resource targetStorageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if (useStorageTarget) {
-  #disable-next-line BCP334
-  name: !empty(targetStorageAccountName) ? targetStorageAccountName : 'placeholder'
+resource storageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if (isStorage) {
+  name: targetName
 }
 
-resource targetBlobService 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' existing = if (useStorageTarget && contains(storageServices, 'blob')) {
-  parent: targetStorageAccount
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2024-01-01' existing = if (isStorage && contains(storageServices, 'blob')) {
+  parent: storageAccount
   name: 'default'
 }
 
-resource targetQueueService 'Microsoft.Storage/storageAccounts/queueServices@2024-01-01' existing = if (useStorageTarget && contains(storageServices, 'queue')) {
-  parent: targetStorageAccount
+resource queueService 'Microsoft.Storage/storageAccounts/queueServices@2024-01-01' existing = if (isStorage && contains(storageServices, 'queue')) {
+  parent: storageAccount
   name: 'default'
 }
 
-resource targetTableService 'Microsoft.Storage/storageAccounts/tableServices@2024-01-01' existing = if (useStorageTarget && contains(storageServices, 'table')) {
-  parent: targetStorageAccount
+resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2024-01-01' existing = if (isStorage && contains(storageServices, 'table')) {
+  parent: storageAccount
   name: 'default'
 }
 
-resource targetFileService 'Microsoft.Storage/storageAccounts/fileServices@2024-01-01' existing = if (useStorageTarget && contains(storageServices, 'file')) {
-  parent: targetStorageAccount
+resource fileService 'Microsoft.Storage/storageAccounts/fileServices@2024-01-01' existing = if (isStorage && contains(storageServices, 'file')) {
+  parent: storageAccount
   name: 'default'
 }
 
@@ -91,8 +92,8 @@ resource targetFileService 'Microsoft.Storage/storageAccounts/fileServices@2024-
 //    RESOURCES
 // ------------------
 
-resource diagnosticSettingsAccount 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (useAccountTarget) {
-  scope: targetAccount
+resource diagnosticSettingsAccount 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (isAccount) {
+  scope: cognitiveAccount
   name: name
   properties: {
     workspaceId: workspaceResourceId
@@ -101,8 +102,8 @@ resource diagnosticSettingsAccount 'Microsoft.Insights/diagnosticSettings@2021-0
   }
 }
 
-resource diagnosticSettingsServer 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (useServerTarget) {
-  scope: targetServer
+resource diagnosticSettingsServer 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (isServer) {
+  scope: postgresServer
   name: name
   properties: {
     workspaceId: workspaceResourceId
@@ -111,8 +112,8 @@ resource diagnosticSettingsServer 'Microsoft.Insights/diagnosticSettings@2021-05
   }
 }
 
-resource diagnosticSettingsStorageBlob 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (useStorageTarget && contains(storageServices, 'blob')) {
-  scope: targetBlobService
+resource diagnosticSettingsStorageBlob 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (isStorage && contains(storageServices, 'blob')) {
+  scope: blobService
   name: name
   properties: {
     workspaceId: workspaceResourceId
@@ -121,8 +122,8 @@ resource diagnosticSettingsStorageBlob 'Microsoft.Insights/diagnosticSettings@20
   }
 }
 
-resource diagnosticSettingsStorageQueue 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (useStorageTarget && contains(storageServices, 'queue')) {
-  scope: targetQueueService
+resource diagnosticSettingsStorageQueue 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (isStorage && contains(storageServices, 'queue')) {
+  scope: queueService
   name: name
   properties: {
     workspaceId: workspaceResourceId
@@ -131,8 +132,8 @@ resource diagnosticSettingsStorageQueue 'Microsoft.Insights/diagnosticSettings@2
   }
 }
 
-resource diagnosticSettingsStorageTable 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (useStorageTarget && contains(storageServices, 'table')) {
-  scope: targetTableService
+resource diagnosticSettingsStorageTable 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (isStorage && contains(storageServices, 'table')) {
+  scope: tableService
   name: name
   properties: {
     workspaceId: workspaceResourceId
@@ -141,8 +142,8 @@ resource diagnosticSettingsStorageTable 'Microsoft.Insights/diagnosticSettings@2
   }
 }
 
-resource diagnosticSettingsStorageFile 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (useStorageTarget && contains(storageServices, 'file')) {
-  scope: targetFileService
+resource diagnosticSettingsStorageFile 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (isStorage && contains(storageServices, 'file')) {
+  scope: fileService
   name: name
   properties: {
     workspaceId: workspaceResourceId
@@ -155,17 +156,5 @@ resource diagnosticSettingsStorageFile 'Microsoft.Insights/diagnosticSettings@20
 //    OUTPUTS
 // ------------------
 
-var storageDiagnosticSettingIds = concat(
-  contains(storageServices, 'blob') ? [diagnosticSettingsStorageBlob.?id ?? ''] : [],
-  contains(storageServices, 'queue') ? [diagnosticSettingsStorageQueue.?id ?? ''] : [],
-  contains(storageServices, 'table') ? [diagnosticSettingsStorageTable.?id ?? ''] : [],
-  contains(storageServices, 'file') ? [diagnosticSettingsStorageFile.?id ?? ''] : []
-)
-
-var storageDiagnosticSettingId = length(storageDiagnosticSettingIds) > 0 ? storageDiagnosticSettingIds[0] : ''
-
-@description('The resource ID of the diagnostic settings resource')
-output id string = diagnosticSettingsServer.?id ?? diagnosticSettingsAccount.?id ?? storageDiagnosticSettingId ?? ''
-
-@description('The name of the diagnostic settings resource')
-output name string = diagnosticSettingsServer.?name ?? diagnosticSettingsAccount.?name ?? name
+@description('The name of the diagnostic settings resource.')
+output name string = name

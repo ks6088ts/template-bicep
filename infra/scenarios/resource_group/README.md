@@ -18,13 +18,13 @@ This scenario targets the subscription scope and delegates the actual resource g
 
 ## Parameters
 
-| Parameter  | Type     | Default                                       | Description                                                |
-| ---------- | -------- | --------------------------------------------- | ---------------------------------------------------------- |
-| `name`     | `string` | _required_                                    | Scenario name used to derive the resource group name.      |
-| `location` | `string` | _required_                                    | Azure region where the resource group is created.          |
-| `tags`     | `object` | `{ scenario: name, managedBy: 'bicep' }`      | Tags applied to the resource group.                        |
+| Parameter  | Type     | Default                                       | Description                                                                                |
+| ---------- | -------- | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `name`     | `string` | _required_                                    | Scenario name used to derive the resource group name (`rg-templatebicep-{name}`) and as the default `scenario` tag. |
+| `location` | `string` | _required_                                    | Azure region where the resource group is created.                                          |
+| `tags`     | `object` | `{ scenario: name, managedBy: 'bicep' }`      | Tags applied to the resource group.                                                        |
 
-The resource group name is derived as `rg-{name}`.
+The resource group name is derived as `rg-templatebicep-{name}`.
 
 ## Outputs
 

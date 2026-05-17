@@ -2,25 +2,23 @@
 //    PARAMETERS
 // ------------------
 
-@description('The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this or targetStorageAccountName.')
-@minLength(0)
-@maxLength(59)
-param targetAccountName string = ''
+@description('Kind of the resource that the role is scoped to.')
+@allowed([
+  'CognitiveServicesAccount'
+  'StorageAccount'
+])
+param targetKind string
 
-@description('The name of the target Azure Storage Account resource. Provide either this or targetAccountName.')
-@minLength(0)
-@maxLength(24)
-param targetStorageAccountName string = ''
+@description('Name of the target resource (Cognitive Services account or Storage account).')
+param targetName string
 
-@description('The principal ID that receives the role assignment')
-@minLength(1)
+@description('Principal (object) ID that receives the role assignment.')
 param principalId string
 
-@description('The fully qualified role definition resource ID')
-@minLength(1)
+@description('Fully qualified role definition resource ID.')
 param roleDefinitionId string
 
-@description('The principal type for the role assignment')
+@description('Principal type for the role assignment.')
 @allowed([
   'Device'
   'ForeignGroup'
@@ -30,38 +28,28 @@ param roleDefinitionId string
 ])
 param principalType string = 'ServicePrincipal'
 
-@description('Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated')
-param roleAssignmentNameSeed string = ''
-
 // ------------------
 //    VARIABLES
 // ------------------
 
-var useStorageTarget = !empty(targetStorageAccountName)
-var useAccountTarget = !useStorageTarget && !empty(targetAccountName)
-
-var roleAssignmentName = empty(roleAssignmentNameSeed)
-  ? guid(!empty(targetStorageAccountName) ? targetStorageAccountName : targetAccountName, principalId, roleDefinitionId)
-  : roleAssignmentNameSeed
+var isStorage = targetKind == 'StorageAccount'
+var roleAssignmentName = guid(targetKind, targetName, principalId, roleDefinitionId)
 
 // ------------------
 //    RESOURCES
 // ------------------
 
-// NOTE: API version pinned to `2025-06-01` to match the parent Foundry account module.
-resource targetAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (!empty(targetAccountName)) {
-  #disable-next-line BCP334
-  name: !empty(targetAccountName) ? targetAccountName : 'placeholder'
+resource cognitiveAccount 'Microsoft.CognitiveServices/accounts@2025-06-01' existing = if (!isStorage) {
+  name: targetName
 }
 
-resource targetStorageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if (!empty(targetStorageAccountName)) {
-  #disable-next-line BCP334
-  name: !empty(targetStorageAccountName) ? targetStorageAccountName : 'placeholder'
+resource storageAccount 'Microsoft.Storage/storageAccounts@2024-01-01' existing = if (isStorage) {
+  name: targetName
 }
 
-resource roleAssignmentAccount 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (useAccountTarget) {
+resource roleAssignmentAccount 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!isStorage) {
   name: roleAssignmentName
-  scope: targetAccount
+  scope: cognitiveAccount
   properties: {
     principalId: principalId
     roleDefinitionId: roleDefinitionId
@@ -69,9 +57,9 @@ resource roleAssignmentAccount 'Microsoft.Authorization/roleAssignments@2022-04-
   }
 }
 
-resource roleAssignmentStorage 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (useStorageTarget) {
+resource roleAssignmentStorage 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (isStorage) {
   name: roleAssignmentName
-  scope: targetStorageAccount
+  scope: storageAccount
   properties: {
     principalId: principalId
     roleDefinitionId: roleDefinitionId
@@ -83,8 +71,8 @@ resource roleAssignmentStorage 'Microsoft.Authorization/roleAssignments@2022-04-
 //    OUTPUTS
 // ------------------
 
-@description('The resource ID of the role assignment')
-output id string = roleAssignmentStorage.?id ?? roleAssignmentAccount.?id ?? ''
+@description('The resource ID of the role assignment.')
+output id string = isStorage ? roleAssignmentStorage.id : roleAssignmentAccount.id
 
-@description('The name of the role assignment')
-output name string = roleAssignmentStorage.?name ?? roleAssignmentAccount.?name ?? roleAssignmentName
+@description('The name (GUID) of the role assignment.')
+output name string = roleAssignmentName

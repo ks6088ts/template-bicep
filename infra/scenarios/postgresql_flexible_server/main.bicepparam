@@ -1,8 +1,6 @@
 using 'main.bicep'
 
-// NOTE: 'templatebicepostgres' is used to stay within the 63-character limit for the derived
-// server name 'psql-templatebicepostgres' (25 chars) and avoid hyphens in the base name.
-param name = 'templatebicepostgres'
+param name = 'postgresqlflexibleserver'
 param location = 'japaneast'
 param tags = {
   environment: 'dev'

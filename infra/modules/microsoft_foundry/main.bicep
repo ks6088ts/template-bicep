@@ -3,7 +3,6 @@
 // ------------------
 
 @description('The name of the Azure AI Foundry account')
-@minLength(2)
 @maxLength(59)
 param name string
 
@@ -14,7 +13,6 @@ param location string
 param tags object = {}
 
 @description('The custom subdomain name for the Azure AI Foundry account endpoint')
-@minLength(2)
 @maxLength(64)
 param customSubDomainName string = name
 

@@ -13,7 +13,7 @@ type uamiReference = {
   resourceGroup: string
 }
 
-@description('A (UAMI, role definition) pair generated for each role assignment iteration.')
+@description('A (UAMI, role definition) pair for granting Foundry inference permissions to an existing UAMI at account scope.')
 type uamiRolePair = {
   @description('Index of the UAMI in `existingUserAssignedIdentities` whose principalId receives the role.')
   uamiIndex: int
@@ -22,10 +22,13 @@ type uamiRolePair = {
   roleDefinitionGuid: string
 }
 
-@description('A (principal object ID, role definition) pair generated for each service principal/user role assignment iteration.')
+@description('A (principal, role definition) pair for granting Foundry inference permissions to an existing service principal or user at account scope.')
 type principalRolePair = {
   @description('The Microsoft Entra principal (object) ID that receives the role.')
   principalId: string
+
+  @description('The principal type for the role assignment.')
+  principalType: 'ServicePrincipal' | 'User'
 
   @description('Role definition GUID to grant at Foundry account scope.')
   roleDefinitionGuid: string
@@ -106,43 +109,49 @@ param roleDefinitionIds string[] = [
 //    VARIABLES
 // ------------------
 
-var resourceGroupName = 'rg-${name}'
-var foundryAccountName = take(toLower(replace('aif-${name}', '_', '-')), 59)
-var foundryProjectName = take('proj-${name}', 64)
+var foundryBaseName = replace(name, 'microsoft', '')
+var resourceGroupName = 'rg-templatebicep-${name}'
+var suffix = uniqueString(subscription().id, name)
+var foundryAccountName = take(toLower(replace('aif-${foundryBaseName}${suffix}', '_', '-')), 59)
+var foundryProjectName = take('proj-${foundryBaseName}', 64)
 var logAnalyticsWorkspaceName = take(toLower(replace('law-${name}', '_', '-')), 63)
 var applicationInsightsName = take(toLower(replace('appi-${name}', '_', '-')), 260)
 var foundryDiagnosticSettingsName = take('diag-${foundryAccountName}', 64)
 var foundryAppInsightsConnectionName = take('appinsights-${foundryProjectName}', 64)
 
-// Cross-product each identity array with `roleDefinitionIds` into a flat list of struct pairs.
-// `map`/`flatten` keep the cross product readable and naturally produce an empty list when the
-// identity array is empty, so no flag variables or `if` guards are required at the loop sites.
+// Cross-product each identity source with `roleDefinitionIds` into flat lists. `map`/`flatten`
+// naturally produce empty lists for empty inputs, so no flag variables or `if` guards are needed
+// at the loop sites. UAMI principalIds are resolved at deployment time inside the module loop
+// (Bicep requires compile-time-known values in `var` cross products and `for` counts).
 var uamiRolePairs uamiRolePair[] = flatten(map(
   range(0, length(existingUserAssignedIdentities)),
   uamiIndex =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
+    map(roleDefinitionIds, role => {
       uamiIndex: uamiIndex
-      roleDefinitionGuid: roleDefinitionGuid
+      roleDefinitionGuid: role
     })
 ))
 
-var servicePrincipalRolePairs principalRolePair[] = flatten(map(
-  existingServicePrincipalObjectIds,
-  principalId =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
-      principalId: principalId
-      roleDefinitionGuid: roleDefinitionGuid
-    })
-))
-
-var userRolePairs principalRolePair[] = flatten(map(
-  existingUserObjectIds,
-  principalId =>
-    map(roleDefinitionIds, roleDefinitionGuid => {
-      principalId: principalId
-      roleDefinitionGuid: roleDefinitionGuid
-    })
-))
+var principalRolePairs principalRolePair[] = concat(
+  flatten(map(
+    existingServicePrincipalObjectIds,
+    pid =>
+      map(roleDefinitionIds, role => {
+        principalId: pid
+        principalType: 'ServicePrincipal'
+        roleDefinitionGuid: role
+      })
+  )),
+  flatten(map(
+    existingUserObjectIds,
+    pid =>
+      map(roleDefinitionIds, role => {
+        principalId: pid
+        principalType: 'User'
+        roleDefinitionGuid: role
+      })
+  ))
+)
 
 // ------------------
 //    EXISTING RESOURCES
@@ -172,7 +181,6 @@ module foundryAccount '../../modules/microsoft_foundry/main.bicep' = {
   name: take('${name}-foundry-account-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     name: foundryAccountName
     location: location
     tags: tags
@@ -185,7 +193,6 @@ module foundryProject '../../modules/microsoft_foundry_project/main.bicep' = {
   name: take('${name}-foundry-project-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     parentAccountName: foundryAccountName
     name: foundryProjectName
     location: location
@@ -199,7 +206,6 @@ module logAnalyticsWorkspace '../../modules/log_analytics_workspace/main.bicep' 
   name: take('${name}-law-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     name: logAnalyticsWorkspaceName
     location: location
     tags: tags
@@ -211,7 +217,6 @@ module applicationInsights '../../modules/application_insights/main.bicep' = if 
   name: take('${name}-appi-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     name: applicationInsightsName
     location: location
     workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
@@ -225,8 +230,8 @@ module foundryDiagnosticSettings '../../modules/diagnostic_settings/main.bicep' 
   params: {
     name: foundryDiagnosticSettingsName
     workspaceResourceId: logAnalyticsWorkspace.?outputs.id ?? ''
-    #disable-next-line BCP334
-    targetAccountName: foundryAccountName
+    targetKind: 'CognitiveServicesAccount'
+    targetName: foundryAccountName
   }
   dependsOn: [
     foundryAccount
@@ -237,7 +242,6 @@ module foundryAppInsightsConnection '../../modules/microsoft_foundry_connection/
   name: take('${name}-appinsights-connection-deployment', 64)
   scope: az.resourceGroup(resourceGroupName)
   params: {
-    #disable-next-line BCP334
     parentAccountName: foundryAccountName
     name: foundryAppInsightsConnectionName
     parentProjectName: foundryProjectName
@@ -259,7 +263,6 @@ module modelDeployments '../../modules/microsoft_foundry_model_deployment/main.b
     name: take('${name}-model-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
-      #disable-next-line BCP334
       parentAccountName: foundryAccountName
       name: model.name
       modelName: model.modelName
@@ -278,47 +281,28 @@ module uamiRoleAssignments '../../modules/role_assignment/main.bicep' = [
     name: take('${name}-uami-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
-      #disable-next-line BCP334
-      targetAccountName: foundryAccountName
+      targetKind: 'CognitiveServicesAccount'
+      targetName: foundryAccountName
       principalId: uamis[pair.uamiIndex].properties.principalId
-      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
-      roleAssignmentNameSeed: guid(
-        foundryAccount.outputs.id,
-        uamis[pair.uamiIndex].properties.principalId,
-        pair.roleDefinitionGuid
-      )
       principalType: 'ServicePrincipal'
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
     }
+    dependsOn: [foundryAccount]
   }
 ]
 
-module servicePrincipalRoleAssignments '../../modules/role_assignment/main.bicep' = [
-  for (pair, i) in servicePrincipalRolePairs: {
-    name: take('${name}-sp-role-${i}-deployment', 64)
+module principalRoleAssignments '../../modules/role_assignment/main.bicep' = [
+  for (pair, i) in principalRolePairs: {
+    name: take('${name}-principal-role-${i}-deployment', 64)
     scope: az.resourceGroup(resourceGroupName)
     params: {
-      #disable-next-line BCP334
-      targetAccountName: foundryAccountName
+      targetKind: 'CognitiveServicesAccount'
+      targetName: foundryAccountName
       principalId: pair.principalId
+      principalType: pair.principalType
       roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
-      roleAssignmentNameSeed: guid(foundryAccount.outputs.id, pair.principalId, pair.roleDefinitionGuid)
-      principalType: 'ServicePrincipal'
     }
-  }
-]
-
-module userRoleAssignments '../../modules/role_assignment/main.bicep' = [
-  for (pair, i) in userRolePairs: {
-    name: take('${name}-user-role-${i}-deployment', 64)
-    scope: az.resourceGroup(resourceGroupName)
-    params: {
-      #disable-next-line BCP334
-      targetAccountName: foundryAccountName
-      principalId: pair.principalId
-      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', pair.roleDefinitionGuid)
-      roleAssignmentNameSeed: guid(foundryAccount.outputs.id, pair.principalId, pair.roleDefinitionGuid)
-      principalType: 'User'
-    }
+    dependsOn: [foundryAccount]
   }
 ]
 
@@ -362,13 +346,10 @@ output applicationInsightsId string = applicationInsights.?outputs.id ?? ''
 @description('The connection string of the created Application Insights component (empty when observability is disabled)')
 output applicationInsightsConnectionString string = applicationInsights.?outputs.connectionString ?? ''
 
-@description('The resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached)')
+@description('Resource IDs of role assignments granted to every existing User Assigned Managed Identity (empty when no UAMI is attached).')
 output uamiRoleAssignmentIds string[] = [for (pair, i) in uamiRolePairs: uamiRoleAssignments[i].outputs.id]
 
-@description('The resource IDs of role assignments granted to every existing service principal (empty when no service principal is attached)')
-output servicePrincipalRoleAssignmentIds string[] = [
-  for (pair, i) in servicePrincipalRolePairs: servicePrincipalRoleAssignments[i].outputs.id
+@description('Resource IDs of role assignments granted to every existing service principal and user (empty when none are attached).')
+output principalRoleAssignmentIds string[] = [
+  for (pair, i) in principalRolePairs: principalRoleAssignments[i].outputs.id
 ]
-
-@description('The resource IDs of role assignments granted to every existing user (empty when no user is attached)')
-output userRoleAssignmentIds string[] = [for (pair, i) in userRolePairs: userRoleAssignments[i].outputs.id]
