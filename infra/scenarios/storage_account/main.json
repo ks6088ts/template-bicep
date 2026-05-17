@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.43.8.12551",
-      "templateHash": "222378873996971655"
+      "version": "0.42.1.51946",
+      "templateHash": "5735221062250773448"
     }
   },
   "definitions": {
@@ -305,8 +305,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "13006231347032579543"
+              "version": "0.42.1.51946",
+              "templateHash": "10375022168103187164"
             }
           },
           "parameters": {
@@ -424,8 +424,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "3912676843792972109"
+              "version": "0.42.1.51946",
+              "templateHash": "11407922653698836360"
             }
           },
           "parameters": {
@@ -903,8 +903,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "15282767757597819840"
+              "version": "0.42.1.51946",
+              "templateHash": "9009423525462246214"
             }
           },
           "parameters": {
@@ -1004,8 +1004,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "12159027116501165986"
+              "version": "0.42.1.51946",
+              "templateHash": "11382761312679724490"
             }
           },
           "parameters": {
@@ -1223,8 +1223,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "17141569987385327096"
+              "version": "0.42.1.51946",
+              "templateHash": "8487968042679699208"
             }
           },
           "parameters": {
@@ -1244,6 +1244,24 @@
               "maxLength": 24,
               "metadata": {
                 "description": "The name of the target Azure Storage Account resource. Provide either this or targetAccountName."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the target Azure Container Registry resource."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the target Azure Container App resource."
               }
             },
             "principalId": {
@@ -1285,7 +1303,9 @@
           "variables": {
             "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
             "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
-            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), parameters('targetAccountName')), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+            "useRegistryTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(empty(parameters('targetRegistryName'))))]",
+            "useContainerAppTarget": "[and(and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(variables('useRegistryTarget'))), not(empty(parameters('targetContainerAppName'))))]",
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), parameters('targetContainerAppName')))), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
           },
           "resources": [
             {
@@ -1311,6 +1331,30 @@
                 "roleDefinitionId": "[parameters('roleDefinitionId')]",
                 "principalType": "[parameters('principalType')]"
               }
+            },
+            {
+              "condition": "[variables('useRegistryTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useContainerAppTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
             }
           ],
           "outputs": {
@@ -1319,14 +1363,14 @@
               "metadata": {
                 "description": "The resource ID of the role assignment"
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useRegistryTarget'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useContainerAppTarget'), extensionResourceId(resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
             },
             "name": {
               "type": "string",
               "metadata": {
                 "description": "The name of the role assignment"
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), if(variables('useRegistryTarget'), variables('roleAssignmentName'), null())), if(variables('useContainerAppTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
             }
           }
         }
@@ -1374,8 +1418,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "17141569987385327096"
+              "version": "0.42.1.51946",
+              "templateHash": "8487968042679699208"
             }
           },
           "parameters": {
@@ -1395,6 +1439,24 @@
               "maxLength": 24,
               "metadata": {
                 "description": "The name of the target Azure Storage Account resource. Provide either this or targetAccountName."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the target Azure Container Registry resource."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the target Azure Container App resource."
               }
             },
             "principalId": {
@@ -1436,7 +1498,9 @@
           "variables": {
             "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
             "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
-            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), parameters('targetAccountName')), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+            "useRegistryTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(empty(parameters('targetRegistryName'))))]",
+            "useContainerAppTarget": "[and(and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(variables('useRegistryTarget'))), not(empty(parameters('targetContainerAppName'))))]",
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), parameters('targetContainerAppName')))), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
           },
           "resources": [
             {
@@ -1462,6 +1526,30 @@
                 "roleDefinitionId": "[parameters('roleDefinitionId')]",
                 "principalType": "[parameters('principalType')]"
               }
+            },
+            {
+              "condition": "[variables('useRegistryTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useContainerAppTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
             }
           ],
           "outputs": {
@@ -1470,14 +1558,14 @@
               "metadata": {
                 "description": "The resource ID of the role assignment"
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useRegistryTarget'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useContainerAppTarget'), extensionResourceId(resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
             },
             "name": {
               "type": "string",
               "metadata": {
                 "description": "The name of the role assignment"
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), if(variables('useRegistryTarget'), variables('roleAssignmentName'), null())), if(variables('useContainerAppTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
             }
           }
         }
@@ -1523,8 +1611,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.43.8.12551",
-              "templateHash": "17141569987385327096"
+              "version": "0.42.1.51946",
+              "templateHash": "8487968042679699208"
             }
           },
           "parameters": {
@@ -1544,6 +1632,24 @@
               "maxLength": 24,
               "metadata": {
                 "description": "The name of the target Azure Storage Account resource. Provide either this or targetAccountName."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the target Azure Container Registry resource."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the target Azure Container App resource."
               }
             },
             "principalId": {
@@ -1585,7 +1691,9 @@
           "variables": {
             "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
             "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
-            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), parameters('targetAccountName')), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+            "useRegistryTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(empty(parameters('targetRegistryName'))))]",
+            "useContainerAppTarget": "[and(and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(variables('useRegistryTarget'))), not(empty(parameters('targetContainerAppName'))))]",
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), parameters('targetContainerAppName')))), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
           },
           "resources": [
             {
@@ -1611,6 +1719,30 @@
                 "roleDefinitionId": "[parameters('roleDefinitionId')]",
                 "principalType": "[parameters('principalType')]"
               }
+            },
+            {
+              "condition": "[variables('useRegistryTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useContainerAppTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
             }
           ],
           "outputs": {
@@ -1619,14 +1751,14 @@
               "metadata": {
                 "description": "The resource ID of the role assignment"
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useRegistryTarget'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useContainerAppTarget'), extensionResourceId(resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
             },
             "name": {
               "type": "string",
               "metadata": {
                 "description": "The name of the role assignment"
               },
-              "value": "[coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), if(variables('useRegistryTarget'), variables('roleAssignmentName'), null())), if(variables('useContainerAppTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
             }
           }
         }
