@@ -1,0 +1,2211 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "languageVersion": "2.0",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.42.1.51946",
+      "templateHash": "10059783097854482054"
+    }
+  },
+  "definitions": {
+    "uamiReference": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "metadata": {
+            "description": "The name of the existing User Assigned Managed Identity."
+          }
+        },
+        "resourceGroup": {
+          "type": "string",
+          "metadata": {
+            "description": "The resource group name where the existing UAMI lives."
+          }
+        }
+      },
+      "metadata": {
+        "description": "Reference to an existing User Assigned Managed Identity (UAMI)."
+      }
+    },
+    "uamiRolePair": {
+      "type": "object",
+      "properties": {
+        "uamiIndex": {
+          "type": "int",
+          "metadata": {
+            "description": "Index of the UAMI in `existingUserAssignedIdentities` whose principalId receives the role."
+          }
+        },
+        "roleDefinitionGuid": {
+          "type": "string",
+          "metadata": {
+            "description": "Role definition GUID to grant at Container App scope."
+          }
+        }
+      },
+      "metadata": {
+        "description": "A (UAMI, role definition) pair generated for each role assignment iteration."
+      }
+    },
+    "principalRolePair": {
+      "type": "object",
+      "properties": {
+        "principalId": {
+          "type": "string",
+          "metadata": {
+            "description": "The Microsoft Entra principal (object) ID that receives the role."
+          }
+        },
+        "roleDefinitionGuid": {
+          "type": "string",
+          "metadata": {
+            "description": "Role definition GUID to grant at Container App scope."
+          }
+        }
+      },
+      "metadata": {
+        "description": "A (principal object ID, role definition) pair generated for each service principal/user role assignment iteration."
+      }
+    }
+  },
+  "parameters": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "metadata": {
+        "description": "The name of the scenario, used to derive resource names"
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "The location for the resource group and Container Apps resources"
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {
+        "scenario": "[parameters('name')]",
+        "managedBy": "bicep"
+      },
+      "metadata": {
+        "description": "Tags applied to all resources"
+      }
+    },
+    "containerImage": {
+      "type": "string",
+      "defaultValue": "nginx:latest",
+      "metadata": {
+        "description": "The container image for the Container App"
+      }
+    },
+    "containerCommand": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional command override for the container"
+      }
+    },
+    "containerArgs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional arguments override for the container"
+      }
+    },
+    "cpu": {
+      "type": "string",
+      "defaultValue": "0.5",
+      "metadata": {
+        "description": "The CPU allocation for the container"
+      }
+    },
+    "memory": {
+      "type": "string",
+      "defaultValue": "1Gi",
+      "metadata": {
+        "description": "The memory allocation for the container"
+      }
+    },
+    "minReplicas": {
+      "type": "int",
+      "defaultValue": 0,
+      "minValue": 0,
+      "metadata": {
+        "description": "Minimum number of replicas"
+      }
+    },
+    "maxReplicas": {
+      "type": "int",
+      "defaultValue": 3,
+      "minValue": 1,
+      "metadata": {
+        "description": "Maximum number of replicas"
+      }
+    },
+    "targetPort": {
+      "type": "int",
+      "defaultValue": 80,
+      "minValue": 1,
+      "maxValue": 65535,
+      "metadata": {
+        "description": "Target port for ingress"
+      }
+    },
+    "ingressExternal": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "When true, enables external ingress"
+      }
+    },
+    "acrSkuName": {
+      "type": "string",
+      "defaultValue": "Basic",
+      "allowedValues": [
+        "Basic",
+        "Standard",
+        "Premium"
+      ],
+      "metadata": {
+        "description": "The SKU name for Azure Container Registry"
+      }
+    },
+    "enableEasyAuth": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "When true, configures Easy Auth with Microsoft Entra ID provider"
+      }
+    },
+    "easyAuthRequireAuthentication": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "When true and Easy Auth is enabled, unauthenticated users are redirected to login page"
+      }
+    },
+    "easyAuthEntraClientId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Client ID of the Microsoft Entra app registration used by Easy Auth"
+      }
+    },
+    "easyAuthAllowedAudiences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Allowed audiences for Easy Auth token validation"
+      }
+    },
+    "existingUserAssignedIdentities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/uamiReference"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional. Array of existing User Assigned Managed Identities (UAMI) to attach to the Container App and grant roles at Container App scope."
+      }
+    },
+    "existingServicePrincipalObjectIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional. Array of object IDs of existing Microsoft Entra service principals to grant roles at Container App scope."
+      }
+    },
+    "existingUserObjectIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional. Array of object IDs of existing Microsoft Entra users to grant roles at Container App scope."
+      }
+    },
+    "roleDefinitionIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "defaultValue": [],
+      "metadata": {
+        "description": "Role definition GUIDs assigned to every existing UAMI, service principal, and user at Container App scope."
+      }
+    }
+  },
+  "variables": {
+    "copy": [
+      {
+        "name": "existingUamiResourceIds",
+        "count": "[length(parameters('existingUserAssignedIdentities'))]",
+        "input": "[extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('existingUserAssignedIdentities')[copyIndex('existingUamiResourceIds')].resourceGroup), 'Microsoft.ManagedIdentity/userAssignedIdentities', parameters('existingUserAssignedIdentities')[copyIndex('existingUamiResourceIds')].name)]"
+      }
+    ],
+    "resourceGroupName": "[format('rg-{0}', parameters('name'))]",
+    "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
+    "acrName": "[take(toLower(replace(replace(format('acr{0}', parameters('name')), '_', ''), '-', '')), 50)]",
+    "uamiName": "[take(toLower(replace(format('id-{0}', parameters('name')), '_', '-')), 128)]",
+    "containerAppEnvironmentName": "[take(toLower(replace(format('cae-{0}', parameters('name')), '_', '-')), 32)]",
+    "containerAppName": "[take(toLower(replace(format('ca-{0}', parameters('name')), '_', '-')), 32)]",
+    "acrPullRoleDefinitionGuid": "7f951dda-4ed3-4680-a7ca-43fe172d538d",
+    "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
+    "servicePrincipalRolePairs": "[flatten(map(parameters('existingServicePrincipalObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]",
+    "userRolePairs": "[flatten(map(parameters('existingUserObjectIds'), lambda('principalId', map(parameters('roleDefinitionIds'), lambda('roleDefinitionGuid', createObject('principalId', lambdaVariables('principalId'), 'roleDefinitionGuid', lambdaVariables('roleDefinitionGuid')))))))]"
+  },
+  "resources": {
+    "existingUamis": {
+      "copy": {
+        "name": "existingUamis",
+        "count": "[length(parameters('existingUserAssignedIdentities'))]"
+      },
+      "existing": true,
+      "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+      "apiVersion": "2024-11-30",
+      "resourceGroup": "[parameters('existingUserAssignedIdentities')[copyIndex()].resourceGroup]",
+      "name": "[parameters('existingUserAssignedIdentities')[copyIndex()].name]"
+    },
+    "logAnalyticsWorkspace": {
+      "existing": true,
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "name": "[variables('logAnalyticsWorkspaceName')]"
+    },
+    "resourceGroup": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-rg-deployment', parameters('name')), 64)]",
+      "location": "[deployment().location]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('resourceGroupName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "10375022168103187164"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 90,
+              "metadata": {
+                "description": "The name of the resource group"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the resource group will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the resource group"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Resources/resourceGroups",
+              "apiVersion": "2025-04-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the resource group"
+              },
+              "value": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the resource group"
+              },
+              "value": "[parameters('name')]"
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The location of the resource group"
+              },
+              "value": "[reference(subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('name')), '2025-04-01', 'full').location]"
+            }
+          }
+        }
+      }
+    },
+    "logAnalyticsWorkspaceModule": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-law-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('logAnalyticsWorkspaceName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "9009423525462246214"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 63,
+              "metadata": {
+                "description": "The name of the Log Analytics workspace"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Log Analytics workspace will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Log Analytics workspace"
+              }
+            },
+            "retentionInDays": {
+              "type": "int",
+              "defaultValue": 30,
+              "minValue": 30,
+              "maxValue": 730,
+              "metadata": {
+                "description": "The retention period (days) for workspace data"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": "[parameters('retentionInDays')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Log Analytics workspace"
+              },
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Log Analytics workspace"
+              },
+              "value": "[parameters('name')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "containerRegistry": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-acr-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('acrName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "skuName": {
+            "value": "[parameters('acrSkuName')]"
+          },
+          "adminUserEnabled": {
+            "value": false
+          },
+          "publicNetworkAccess": {
+            "value": "Enabled"
+          },
+          "anonymousPullEnabled": {
+            "value": false
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "17104989737613471020"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the Azure Container Registry"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Azure Container Registry will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Azure Container Registry"
+              }
+            },
+            "skuName": {
+              "type": "string",
+              "defaultValue": "Basic",
+              "allowedValues": [
+                "Basic",
+                "Standard",
+                "Premium"
+              ],
+              "metadata": {
+                "description": "The SKU name for the Azure Container Registry"
+              }
+            },
+            "adminUserEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Enable admin user authentication for the Azure Container Registry. Defaults to false for Entra ID-first authentication."
+              }
+            },
+            "publicNetworkAccess": {
+              "type": "string",
+              "defaultValue": "Enabled",
+              "allowedValues": [
+                "Enabled",
+                "Disabled"
+              ],
+              "metadata": {
+                "description": "Public network access setting for the Azure Container Registry"
+              }
+            },
+            "anonymousPullEnabled": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Allow anonymous pull from the Azure Container Registry"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2023-11-01-preview",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "sku": {
+                "name": "[parameters('skuName')]"
+              },
+              "properties": {
+                "adminUserEnabled": "[parameters('adminUserEnabled')]",
+                "publicNetworkAccess": "[parameters('publicNetworkAccess')]",
+                "anonymousPullEnabled": "[parameters('anonymousPullEnabled')]",
+                "networkRuleBypassOptions": "AzureServices"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Azure Container Registry"
+              },
+              "value": "[resourceId('Microsoft.ContainerRegistry/registries', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Azure Container Registry"
+              },
+              "value": "[parameters('name')]"
+            },
+            "loginServer": {
+              "type": "string",
+              "metadata": {
+                "description": "The login server of the Azure Container Registry"
+              },
+              "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', parameters('name')), '2023-11-01-preview').loginServer]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "userAssignedManagedIdentity": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-uami-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('uamiName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "18350230912836153091"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128,
+              "metadata": {
+                "description": "The name of the User Assigned Managed Identity"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the User Assigned Managed Identity will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the User Assigned Managed Identity"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2024-11-30",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]"
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the User Assigned Managed Identity"
+              },
+              "value": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the User Assigned Managed Identity"
+              },
+              "value": "[parameters('name')]"
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "The principal ID of the User Assigned Managed Identity (used for role assignments)"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').principalId]"
+            },
+            "clientId": {
+              "type": "string",
+              "metadata": {
+                "description": "The client ID of the User Assigned Managed Identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').clientId]"
+            },
+            "tenantId": {
+              "type": "string",
+              "metadata": {
+                "description": "The tenant ID of the User Assigned Managed Identity"
+              },
+              "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('name')), '2024-11-30').tenantId]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "resourceGroup"
+      ]
+    },
+    "containerAppEnvironment": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-cae-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('containerAppEnvironmentName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "logAnalyticsWorkspaceCustomerId": {
+            "value": "[reference('logAnalyticsWorkspace').customerId]"
+          },
+          "logAnalyticsWorkspaceSharedKey": {
+            "value": "[listKeys('logAnalyticsWorkspace', '2023-09-01').primarySharedKey]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "16491413088672612068"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the Container Apps Environment"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Container Apps Environment will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Container Apps Environment"
+              }
+            },
+            "logAnalyticsWorkspaceCustomerId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The Log Analytics workspace customer ID"
+              }
+            },
+            "logAnalyticsWorkspaceSharedKey": {
+              "type": "securestring",
+              "minLength": 1,
+              "metadata": {
+                "description": "The Log Analytics workspace shared key"
+              }
+            },
+            "zoneRedundant": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Whether zone redundancy is enabled for the Container Apps Environment"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.App/managedEnvironments",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "zoneRedundant": "[parameters('zoneRedundant')]",
+                "appLogsConfiguration": {
+                  "destination": "log-analytics",
+                  "logAnalyticsConfiguration": {
+                    "customerId": "[parameters('logAnalyticsWorkspaceCustomerId')]",
+                    "sharedKey": "[parameters('logAnalyticsWorkspaceSharedKey')]"
+                  }
+                }
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Container Apps Environment"
+              },
+              "value": "[resourceId('Microsoft.App/managedEnvironments', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Container Apps Environment"
+              },
+              "value": "[parameters('name')]"
+            },
+            "defaultDomain": {
+              "type": "string",
+              "metadata": {
+                "description": "The default domain of the Container Apps Environment"
+              },
+              "value": "[reference(resourceId('Microsoft.App/managedEnvironments', parameters('name')), '2024-03-01').defaultDomain]"
+            },
+            "staticIp": {
+              "type": "string",
+              "metadata": {
+                "description": "The static IP of the Container Apps Environment"
+              },
+              "value": "[reference(resourceId('Microsoft.App/managedEnvironments', parameters('name')), '2024-03-01').staticIp]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "logAnalyticsWorkspace",
+        "logAnalyticsWorkspaceModule"
+      ]
+    },
+    "containerApp": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-ca-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "name": {
+            "value": "[variables('containerAppName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "tags": {
+            "value": "[parameters('tags')]"
+          },
+          "environmentId": {
+            "value": "[reference('containerAppEnvironment').outputs.id.value]"
+          },
+          "userAssignedIdentityResourceIds": {
+            "value": "[concat(createArray(reference('userAssignedManagedIdentity').outputs.id.value), variables('existingUamiResourceIds'))]"
+          },
+          "enableSystemAssignedIdentity": {
+            "value": true
+          },
+          "containerImage": {
+            "value": "[parameters('containerImage')]"
+          },
+          "containerName": {
+            "value": "app"
+          },
+          "containerCommand": {
+            "value": "[parameters('containerCommand')]"
+          },
+          "containerArgs": {
+            "value": "[parameters('containerArgs')]"
+          },
+          "containerEnv": {
+            "value": []
+          },
+          "cpu": {
+            "value": "[parameters('cpu')]"
+          },
+          "memory": {
+            "value": "[parameters('memory')]"
+          },
+          "minReplicas": {
+            "value": "[parameters('minReplicas')]"
+          },
+          "maxReplicas": {
+            "value": "[parameters('maxReplicas')]"
+          },
+          "targetPort": {
+            "value": "[parameters('targetPort')]"
+          },
+          "ingressExternal": {
+            "value": "[parameters('ingressExternal')]"
+          },
+          "transport": {
+            "value": "auto"
+          },
+          "registries": {
+            "value": [
+              {
+                "server": "[reference('containerRegistry').outputs.loginServer.value]",
+                "identity": "[reference('userAssignedManagedIdentity').outputs.id.value]"
+              }
+            ]
+          },
+          "secrets": {
+            "value": []
+          },
+          "enableEasyAuth": {
+            "value": "[parameters('enableEasyAuth')]"
+          },
+          "easyAuthRequireAuthentication": {
+            "value": "[parameters('easyAuthRequireAuthentication')]"
+          },
+          "easyAuthEntraClientId": {
+            "value": "[parameters('easyAuthEntraClientId')]"
+          },
+          "easyAuthAllowedAudiences": {
+            "value": "[parameters('easyAuthAllowedAudiences')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "languageVersion": "2.0",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "9680940390894877529"
+            }
+          },
+          "parameters": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the Container App"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure region where the Container App will be created"
+              }
+            },
+            "tags": {
+              "type": "object",
+              "defaultValue": {},
+              "metadata": {
+                "description": "Tags applied to the Container App"
+              }
+            },
+            "environmentId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The resource ID of the Container Apps Environment"
+              }
+            },
+            "userAssignedIdentityResourceIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Array of User Assigned Managed Identity resource IDs attached to the Container App"
+              }
+            },
+            "enableSystemAssignedIdentity": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "When true, enables system-assigned managed identity for the Container App"
+              }
+            },
+            "containerImage": {
+              "type": "string",
+              "defaultValue": "nginx:latest",
+              "metadata": {
+                "description": "The container image for the Container App"
+              }
+            },
+            "containerName": {
+              "type": "string",
+              "defaultValue": "app",
+              "metadata": {
+                "description": "The container name inside the Container App template"
+              }
+            },
+            "containerCommand": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Optional command override for the container"
+              }
+            },
+            "containerArgs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Optional arguments override for the container"
+              }
+            },
+            "containerEnv": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Environment variables for the container. Each item supports { name, value } or { name, secretRef }."
+              }
+            },
+            "cpu": {
+              "type": "string",
+              "defaultValue": "0.5",
+              "metadata": {
+                "description": "The CPU allocation for the container"
+              }
+            },
+            "memory": {
+              "type": "string",
+              "defaultValue": "1Gi",
+              "metadata": {
+                "description": "The memory allocation for the container"
+              }
+            },
+            "minReplicas": {
+              "type": "int",
+              "defaultValue": 0,
+              "minValue": 0,
+              "metadata": {
+                "description": "Minimum number of replicas"
+              }
+            },
+            "maxReplicas": {
+              "type": "int",
+              "defaultValue": 3,
+              "minValue": 1,
+              "metadata": {
+                "description": "Maximum number of replicas"
+              }
+            },
+            "targetPort": {
+              "type": "int",
+              "defaultValue": 80,
+              "minValue": 1,
+              "maxValue": 65535,
+              "metadata": {
+                "description": "Target port for ingress"
+              }
+            },
+            "ingressExternal": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "When true, enables external ingress"
+              }
+            },
+            "transport": {
+              "type": "string",
+              "defaultValue": "auto",
+              "allowedValues": [
+                "auto",
+                "http",
+                "http2",
+                "tcp"
+              ],
+              "metadata": {
+                "description": "Ingress transport protocol"
+              }
+            },
+            "registries": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Container registry settings. Each element supports { server, identity }."
+              }
+            },
+            "secrets": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Container App secrets. Each element supports { name, value } or key-vault references."
+              }
+            },
+            "enableEasyAuth": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "When true, configures Easy Auth with Microsoft Entra ID provider"
+              }
+            },
+            "easyAuthRequireAuthentication": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "When true and Easy Auth is enabled, unauthenticated users are redirected to login page"
+              }
+            },
+            "easyAuthEntraClientId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Client ID of the Microsoft Entra app registration used by Easy Auth"
+              }
+            },
+            "easyAuthEntraOpenIdIssuer": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "OpenID issuer URL for Microsoft Entra ID. When empty, uses the current tenant issuer URL."
+              }
+            },
+            "easyAuthAllowedAudiences": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "defaultValue": [],
+              "metadata": {
+                "description": "Allowed audiences for Easy Auth token validation"
+              }
+            }
+          },
+          "variables": {
+            "hasUserAssignedIdentity": "[greater(length(parameters('userAssignedIdentityResourceIds')), 0)]",
+            "identityType": "[if(variables('hasUserAssignedIdentity'), if(parameters('enableSystemAssignedIdentity'), 'SystemAssigned,UserAssigned', 'UserAssigned'), 'SystemAssigned')]",
+            "userAssignedIdentitiesObject": "[reduce(parameters('userAssignedIdentityResourceIds'), createObject(), lambda('acc', 'userAssignedIdentityResourceId', union(lambdaVariables('acc'), createObject(format('{0}', lambdaVariables('userAssignedIdentityResourceId')), createObject()))))]",
+            "effectiveOpenIdIssuer": "[if(empty(parameters('easyAuthEntraOpenIdIssuer')), format('{0}{1}/v2.0', environment().authentication.loginEndpoint, subscription().tenantId), parameters('easyAuthEntraOpenIdIssuer'))]"
+          },
+          "resources": {
+            "containerApp": {
+              "type": "Microsoft.App/containerApps",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('name')]",
+              "location": "[parameters('location')]",
+              "tags": "[parameters('tags')]",
+              "properties": {
+                "managedEnvironmentId": "[parameters('environmentId')]",
+                "configuration": {
+                  "ingress": {
+                    "external": "[parameters('ingressExternal')]",
+                    "targetPort": "[parameters('targetPort')]",
+                    "transport": "[parameters('transport')]"
+                  },
+                  "registries": "[parameters('registries')]",
+                  "secrets": "[parameters('secrets')]"
+                },
+                "template": {
+                  "containers": [
+                    {
+                      "name": "[parameters('containerName')]",
+                      "image": "[parameters('containerImage')]",
+                      "command": "[parameters('containerCommand')]",
+                      "args": "[parameters('containerArgs')]",
+                      "env": "[parameters('containerEnv')]",
+                      "resources": {
+                        "cpu": "[json(parameters('cpu'))]",
+                        "memory": "[parameters('memory')]"
+                      }
+                    }
+                  ],
+                  "scale": {
+                    "minReplicas": "[parameters('minReplicas')]",
+                    "maxReplicas": "[parameters('maxReplicas')]"
+                  }
+                }
+              },
+              "identity": {
+                "type": "[variables('identityType')]",
+                "userAssignedIdentities": "[if(variables('hasUserAssignedIdentity'), variables('userAssignedIdentitiesObject'), null())]"
+              }
+            },
+            "containerAppAuthConfig": {
+              "condition": "[parameters('enableEasyAuth')]",
+              "type": "Microsoft.App/containerApps/authConfigs",
+              "apiVersion": "2024-03-01",
+              "name": "[format('{0}/{1}', parameters('name'), 'current')]",
+              "properties": {
+                "platform": {
+                  "enabled": true
+                },
+                "globalValidation": {
+                  "unauthenticatedClientAction": "[if(parameters('easyAuthRequireAuthentication'), 'RedirectToLoginPage', 'AllowAnonymous')]",
+                  "redirectToProvider": "azureactivedirectory"
+                },
+                "identityProviders": {
+                  "azureActiveDirectory": {
+                    "enabled": true,
+                    "registration": {
+                      "clientId": "[parameters('easyAuthEntraClientId')]",
+                      "openIdIssuer": "[variables('effectiveOpenIdIssuer')]"
+                    },
+                    "validation": {
+                      "allowedAudiences": "[parameters('easyAuthAllowedAudiences')]"
+                    }
+                  }
+                }
+              },
+              "dependsOn": [
+                "containerApp"
+              ]
+            }
+          },
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the Container App"
+              },
+              "value": "[resourceId('Microsoft.App/containerApps', parameters('name'))]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the Container App"
+              },
+              "value": "[parameters('name')]"
+            },
+            "fqdn": {
+              "type": "string",
+              "metadata": {
+                "description": "The fully qualified domain name (FQDN) of the Container App ingress"
+              },
+              "value": "[coalesce(tryGet(reference('containerApp').configuration.ingress, 'fqdn'), '')]"
+            },
+            "latestRevisionName": {
+              "type": "string",
+              "metadata": {
+                "description": "The latest revision name of the Container App"
+              },
+              "value": "[reference('containerApp').latestRevisionName]"
+            },
+            "systemAssignedPrincipalId": {
+              "type": "string",
+              "metadata": {
+                "description": "The system-assigned managed identity principal ID of the Container App (empty when system-assigned identity is disabled)"
+              },
+              "value": "[coalesce(tryGet(reference('containerApp', '2024-03-01', 'full').identity, 'principalId'), '')]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "containerAppEnvironment",
+        "containerRegistry",
+        "userAssignedManagedIdentity"
+      ]
+    },
+    "acrPullRoleAssignment": {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-acr-pull-role-deployment', parameters('name')), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetRegistryName": {
+            "value": "[variables('acrName')]"
+          },
+          "principalId": {
+            "value": "[reference('userAssignedManagedIdentity').outputs.principalId.value]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleDefinitionGuid'))]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference('containerRegistry').outputs.id.value, reference('userAssignedManagedIdentity').outputs.principalId.value, variables('acrPullRoleDefinitionGuid'))]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "15394907855954213735"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this, targetStorageAccountName, targetRegistryName, or targetContainerAppName."
+              }
+            },
+            "targetStorageAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 24,
+              "metadata": {
+                "description": "The name of the target Azure Storage Account resource. Provide either this, targetAccountName, targetRegistryName, or targetContainerAppName."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the target Azure Container Registry resource. Provide either this, targetAccountName, targetStorageAccountName, or targetContainerAppName."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the target Azure Container App resource. Provide either this, targetAccountName, targetStorageAccountName, or targetRegistryName."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
+            "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
+            "useRegistryTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(empty(parameters('targetRegistryName'))))]",
+            "useContainerAppTarget": "[and(and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(variables('useRegistryTarget'))), not(empty(parameters('targetContainerAppName'))))]",
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), parameters('targetContainerAppName')))), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "condition": "[variables('useAccountTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useStorageTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useRegistryTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useContainerAppTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useRegistryTarget'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useContainerAppTarget'), extensionResourceId(resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), if(variables('useRegistryTarget'), variables('roleAssignmentName'), null())), if(variables('useContainerAppTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "containerRegistry",
+        "userAssignedManagedIdentity"
+      ]
+    },
+    "uamiRoleAssignments": {
+      "copy": {
+        "name": "uamiRoleAssignments",
+        "count": "[length(variables('uamiRolePairs'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-uami-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetContainerAppName": {
+            "value": "[variables('containerAppName')]"
+          },
+          "principalId": {
+            "value": "[reference(format('existingUamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference('containerApp').outputs.id.value, reference(format('existingUamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)).principalId, variables('uamiRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "15394907855954213735"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this, targetStorageAccountName, targetRegistryName, or targetContainerAppName."
+              }
+            },
+            "targetStorageAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 24,
+              "metadata": {
+                "description": "The name of the target Azure Storage Account resource. Provide either this, targetAccountName, targetRegistryName, or targetContainerAppName."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the target Azure Container Registry resource. Provide either this, targetAccountName, targetStorageAccountName, or targetContainerAppName."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the target Azure Container App resource. Provide either this, targetAccountName, targetStorageAccountName, or targetRegistryName."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
+            "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
+            "useRegistryTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(empty(parameters('targetRegistryName'))))]",
+            "useContainerAppTarget": "[and(and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(variables('useRegistryTarget'))), not(empty(parameters('targetContainerAppName'))))]",
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), parameters('targetContainerAppName')))), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "condition": "[variables('useAccountTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useStorageTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useRegistryTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useContainerAppTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useRegistryTarget'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useContainerAppTarget'), extensionResourceId(resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), if(variables('useRegistryTarget'), variables('roleAssignmentName'), null())), if(variables('useContainerAppTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "containerApp",
+        "[format('existingUamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]",
+        "[format('existingUamis[{0}]', variables('uamiRolePairs')[copyIndex()].uamiIndex)]"
+      ]
+    },
+    "servicePrincipalRoleAssignments": {
+      "copy": {
+        "name": "servicePrincipalRoleAssignments",
+        "count": "[length(variables('servicePrincipalRolePairs'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-sp-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetContainerAppName": {
+            "value": "[variables('containerAppName')]"
+          },
+          "principalId": {
+            "value": "[variables('servicePrincipalRolePairs')[copyIndex()].principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference('containerApp').outputs.id.value, variables('servicePrincipalRolePairs')[copyIndex()].principalId, variables('servicePrincipalRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "principalType": {
+            "value": "ServicePrincipal"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "15394907855954213735"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this, targetStorageAccountName, targetRegistryName, or targetContainerAppName."
+              }
+            },
+            "targetStorageAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 24,
+              "metadata": {
+                "description": "The name of the target Azure Storage Account resource. Provide either this, targetAccountName, targetRegistryName, or targetContainerAppName."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the target Azure Container Registry resource. Provide either this, targetAccountName, targetStorageAccountName, or targetContainerAppName."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the target Azure Container App resource. Provide either this, targetAccountName, targetStorageAccountName, or targetRegistryName."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
+            "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
+            "useRegistryTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(empty(parameters('targetRegistryName'))))]",
+            "useContainerAppTarget": "[and(and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(variables('useRegistryTarget'))), not(empty(parameters('targetContainerAppName'))))]",
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), parameters('targetContainerAppName')))), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "condition": "[variables('useAccountTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useStorageTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useRegistryTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useContainerAppTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useRegistryTarget'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useContainerAppTarget'), extensionResourceId(resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), if(variables('useRegistryTarget'), variables('roleAssignmentName'), null())), if(variables('useContainerAppTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "containerApp"
+      ]
+    },
+    "userRoleAssignments": {
+      "copy": {
+        "name": "userRoleAssignments",
+        "count": "[length(variables('userRolePairs'))]"
+      },
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[take(format('{0}-user-role-{1}-deployment', parameters('name'), copyIndex()), 64)]",
+      "resourceGroup": "[variables('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "targetContainerAppName": {
+            "value": "[variables('containerAppName')]"
+          },
+          "principalId": {
+            "value": "[variables('userRolePairs')[copyIndex()].principalId]"
+          },
+          "roleDefinitionId": {
+            "value": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "roleAssignmentNameSeed": {
+            "value": "[guid(reference('containerApp').outputs.id.value, variables('userRolePairs')[copyIndex()].principalId, variables('userRolePairs')[copyIndex()].roleDefinitionGuid)]"
+          },
+          "principalType": {
+            "value": "User"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.42.1.51946",
+              "templateHash": "15394907855954213735"
+            }
+          },
+          "parameters": {
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 59,
+              "metadata": {
+                "description": "The name of the target Azure AI Foundry (Cognitive Services) account resource. Provide either this, targetStorageAccountName, targetRegistryName, or targetContainerAppName."
+              }
+            },
+            "targetStorageAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 24,
+              "metadata": {
+                "description": "The name of the target Azure Storage Account resource. Provide either this, targetAccountName, targetRegistryName, or targetContainerAppName."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 50,
+              "metadata": {
+                "description": "The name of the target Azure Container Registry resource. Provide either this, targetAccountName, targetStorageAccountName, or targetContainerAppName."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "minLength": 0,
+              "maxLength": 32,
+              "metadata": {
+                "description": "The name of the target Azure Container App resource. Provide either this, targetAccountName, targetStorageAccountName, or targetRegistryName."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The principal ID that receives the role assignment"
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "minLength": 1,
+              "metadata": {
+                "description": "The fully qualified role definition resource ID"
+              }
+            },
+            "principalType": {
+              "type": "string",
+              "defaultValue": "ServicePrincipal",
+              "allowedValues": [
+                "Device",
+                "ForeignGroup",
+                "Group",
+                "ServicePrincipal",
+                "User"
+              ],
+              "metadata": {
+                "description": "The principal type for the role assignment"
+              }
+            },
+            "roleAssignmentNameSeed": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Optional deterministic seed for role assignment name; when omitted, a deterministic name is generated"
+              }
+            }
+          },
+          "variables": {
+            "useStorageTarget": "[not(empty(parameters('targetStorageAccountName')))]",
+            "useAccountTarget": "[and(not(variables('useStorageTarget')), not(empty(parameters('targetAccountName'))))]",
+            "useRegistryTarget": "[and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(empty(parameters('targetRegistryName'))))]",
+            "useContainerAppTarget": "[and(and(and(not(variables('useStorageTarget')), not(variables('useAccountTarget'))), not(variables('useRegistryTarget'))), not(empty(parameters('targetContainerAppName'))))]",
+            "roleAssignmentName": "[if(empty(parameters('roleAssignmentNameSeed')), guid(if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), parameters('targetContainerAppName')))), parameters('principalId'), parameters('roleDefinitionId')), parameters('roleAssignmentNameSeed'))]"
+          },
+          "resources": [
+            {
+              "condition": "[variables('useAccountTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useStorageTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useRegistryTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('useContainerAppTarget')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            }
+          ],
+          "outputs": {
+            "id": {
+              "type": "string",
+              "metadata": {
+                "description": "The resource ID of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null()), if(variables('useAccountTarget'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useRegistryTarget'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), if(variables('useContainerAppTarget'), extensionResourceId(resourceId('Microsoft.App/containerApps', if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), 'placeholder')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), null())), '')]"
+            },
+            "name": {
+              "type": "string",
+              "metadata": {
+                "description": "The name of the role assignment"
+              },
+              "value": "[coalesce(coalesce(coalesce(coalesce(if(variables('useStorageTarget'), variables('roleAssignmentName'), null()), if(variables('useAccountTarget'), variables('roleAssignmentName'), null())), if(variables('useRegistryTarget'), variables('roleAssignmentName'), null())), if(variables('useContainerAppTarget'), variables('roleAssignmentName'), null())), variables('roleAssignmentName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "containerApp"
+      ]
+    }
+  },
+  "outputs": {
+    "resourceGroupId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created resource group"
+      },
+      "value": "[reference('resourceGroup').outputs.id.value]"
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created resource group"
+      },
+      "value": "[reference('resourceGroup').outputs.name.value]"
+    },
+    "containerRegistryId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Azure Container Registry"
+      },
+      "value": "[reference('containerRegistry').outputs.id.value]"
+    },
+    "containerRegistryLoginServer": {
+      "type": "string",
+      "metadata": {
+        "description": "The login server of the created Azure Container Registry"
+      },
+      "value": "[reference('containerRegistry').outputs.loginServer.value]"
+    },
+    "userAssignedIdentityId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created User Assigned Managed Identity"
+      },
+      "value": "[reference('userAssignedManagedIdentity').outputs.id.value]"
+    },
+    "userAssignedIdentityPrincipalId": {
+      "type": "string",
+      "metadata": {
+        "description": "The principal ID of the created User Assigned Managed Identity"
+      },
+      "value": "[reference('userAssignedManagedIdentity').outputs.principalId.value]"
+    },
+    "userAssignedIdentityClientId": {
+      "type": "string",
+      "metadata": {
+        "description": "The client ID of the created User Assigned Managed Identity"
+      },
+      "value": "[reference('userAssignedManagedIdentity').outputs.clientId.value]"
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Log Analytics workspace"
+      },
+      "value": "[reference('logAnalyticsWorkspaceModule').outputs.id.value]"
+    },
+    "containerAppEnvironmentId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Container Apps Environment"
+      },
+      "value": "[reference('containerAppEnvironment').outputs.id.value]"
+    },
+    "containerAppId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the created Container App"
+      },
+      "value": "[reference('containerApp').outputs.id.value]"
+    },
+    "containerAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "The name of the created Container App"
+      },
+      "value": "[reference('containerApp').outputs.name.value]"
+    },
+    "containerAppFqdn": {
+      "type": "string",
+      "metadata": {
+        "description": "The fully qualified domain name (FQDN) of the created Container App"
+      },
+      "value": "[reference('containerApp').outputs.fqdn.value]"
+    },
+    "containerAppUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "The HTTPS URL of the created Container App"
+      },
+      "value": "[if(empty(reference('containerApp').outputs.fqdn.value), '', format('https://{0}', reference('containerApp').outputs.fqdn.value))]"
+    },
+    "acrPullRoleAssignmentId": {
+      "type": "string",
+      "metadata": {
+        "description": "The resource ID of the AcrPull role assignment granted to the created UAMI"
+      },
+      "value": "[reference('acrPullRoleAssignment').outputs.id.value]"
+    },
+    "uamiRoleAssignmentIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "metadata": {
+        "description": "The resource IDs of role assignments granted to every existing User Assigned Managed Identity at Container App scope"
+      },
+      "copy": {
+        "count": "[length(variables('uamiRolePairs'))]",
+        "input": "[reference(format('uamiRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+      }
+    },
+    "servicePrincipalRoleAssignmentIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "metadata": {
+        "description": "The resource IDs of role assignments granted to every existing service principal at Container App scope"
+      },
+      "copy": {
+        "count": "[length(variables('servicePrincipalRolePairs'))]",
+        "input": "[reference(format('servicePrincipalRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+      }
+    },
+    "userRoleAssignmentIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "metadata": {
+        "description": "The resource IDs of role assignments granted to every existing user at Container App scope"
+      },
+      "copy": {
+        "count": "[length(variables('userRolePairs'))]",
+        "input": "[reference(format('userRoleAssignments[{0}]', copyIndex())).outputs.id.value]"
+      }
+    }
+  }
+}
