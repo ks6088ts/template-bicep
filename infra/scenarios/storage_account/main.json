@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "14424126684324817616"
+      "templateHash": "9200364368769478448"
     }
   },
   "definitions": {
@@ -269,7 +269,8 @@
   },
   "variables": {
     "resourceGroupName": "[format('rg-templatebicep-{0}', parameters('name'))]",
-    "storageAccountName": "[take(toLower(replace(replace(format('st{0}', parameters('name')), '_', ''), '-', '')), 24)]",
+    "suffix": "[uniqueString(subscription().id, parameters('name'))]",
+    "storageAccountName": "[take(toLower(replace(replace(format('st{0}{1}', parameters('name'), variables('suffix')), '_', ''), '-', '')), 24)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
     "storageDiagnosticSettingsName": "[take(format('diag-{0}', variables('storageAccountName')), 64)]",
     "uamiRolePairs": "[flatten(map(range(0, length(parameters('existingUserAssignedIdentities'))), lambda('uamiIndex', map(parameters('roleDefinitionIds'), lambda('role', createObject('uamiIndex', lambdaVariables('uamiIndex'), 'roleDefinitionGuid', lambdaVariables('role')))))))]",

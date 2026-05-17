@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "240624163838610761"
+      "templateHash": "13544118520928861187"
     }
   },
   "definitions": {
@@ -203,7 +203,8 @@
   "variables": {
     "foundryBaseName": "[replace(parameters('name'), 'microsoft', '')]",
     "resourceGroupName": "[format('rg-templatebicep-{0}', parameters('name'))]",
-    "foundryAccountName": "[take(toLower(replace(format('aif-{0}', variables('foundryBaseName')), '_', '-')), 59)]",
+    "suffix": "[uniqueString(subscription().id, parameters('name'))]",
+    "foundryAccountName": "[take(toLower(replace(format('aif-{0}{1}', variables('foundryBaseName'), variables('suffix')), '_', '-')), 59)]",
     "foundryProjectName": "[take(format('proj-{0}', variables('foundryBaseName')), 64)]",
     "logAnalyticsWorkspaceName": "[take(toLower(replace(format('law-{0}', parameters('name')), '_', '-')), 63)]",
     "applicationInsightsName": "[take(toLower(replace(format('appi-{0}', parameters('name')), '_', '-')), 260)]",
