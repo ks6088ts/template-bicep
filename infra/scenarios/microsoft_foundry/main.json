@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.43.8.12551",
-      "templateHash": "13544118520928861187"
+      "templateHash": "12191469987107359579"
     }
   },
   "definitions": {
@@ -1318,24 +1318,57 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "7584345935908390266"
+              "templateHash": "16873888977377597378"
             }
           },
           "parameters": {
             "targetKind": {
               "type": "string",
+              "defaultValue": "",
               "allowedValues": [
+                "",
                 "CognitiveServicesAccount",
-                "StorageAccount"
+                "StorageAccount",
+                "ContainerRegistry",
+                "ContainerApp"
               ],
               "metadata": {
-                "description": "Kind of the resource that the role is scoped to."
+                "description": "Kind of the resource that the role is scoped to (legacy parameter; prefer target*Name parameters)."
               }
             },
             "targetName": {
               "type": "string",
+              "defaultValue": "",
               "metadata": {
-                "description": "Name of the target resource (Cognitive Services account or Storage account)."
+                "description": "Name of the target resource (legacy parameter paired with targetKind; prefer target*Name parameters)."
+              }
+            },
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the target Cognitive Services account scope."
+              }
+            },
+            "targetStorageAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the target Storage account scope."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the target Container Registry scope."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the target Container App scope."
               }
             },
             "principalId": {
@@ -1366,15 +1399,28 @@
             }
           },
           "variables": {
-            "isStorage": "[equals(parameters('targetKind'), 'StorageAccount')]",
-            "roleAssignmentName": "[guid(parameters('targetKind'), parameters('targetName'), parameters('principalId'), parameters('roleDefinitionId'))]"
+            "legacyTargetAccountName": "[if(equals(parameters('targetKind'), 'CognitiveServicesAccount'), parameters('targetName'), '')]",
+            "legacyTargetStorageAccountName": "[if(equals(parameters('targetKind'), 'StorageAccount'), parameters('targetName'), '')]",
+            "legacyTargetRegistryName": "[if(equals(parameters('targetKind'), 'ContainerRegistry'), parameters('targetName'), '')]",
+            "legacyTargetContainerAppName": "[if(equals(parameters('targetKind'), 'ContainerApp'), parameters('targetName'), '')]",
+            "resolvedStorageAccountName": "[if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), variables('legacyTargetStorageAccountName'))]",
+            "resolvedAccountName": "[if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), variables('legacyTargetAccountName'))]",
+            "resolvedRegistryName": "[if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), variables('legacyTargetRegistryName'))]",
+            "resolvedContainerAppName": "[if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), variables('legacyTargetContainerAppName'))]",
+            "roleAssignmentScopeName": "[if(not(empty(variables('resolvedStorageAccountName'))), variables('resolvedStorageAccountName'), if(not(empty(variables('resolvedAccountName'))), variables('resolvedAccountName'), if(not(empty(variables('resolvedRegistryName'))), variables('resolvedRegistryName'), variables('resolvedContainerAppName'))))]",
+            "roleAssignmentScopeKind": "[if(not(empty(variables('resolvedStorageAccountName'))), 'StorageAccount', if(not(empty(variables('resolvedAccountName'))), 'CognitiveServicesAccount', if(not(empty(variables('resolvedRegistryName'))), 'ContainerRegistry', 'ContainerApp')))]",
+            "isStorage": "[equals(variables('roleAssignmentScopeKind'), 'StorageAccount')]",
+            "isCognitiveServices": "[equals(variables('roleAssignmentScopeKind'), 'CognitiveServicesAccount')]",
+            "isRegistry": "[equals(variables('roleAssignmentScopeKind'), 'ContainerRegistry')]",
+            "isContainerApp": "[equals(variables('roleAssignmentScopeKind'), 'ContainerApp')]",
+            "roleAssignmentName": "[guid(variables('roleAssignmentScopeKind'), variables('roleAssignmentScopeName'), parameters('principalId'), parameters('roleDefinitionId'))]"
           },
           "resources": [
             {
-              "condition": "[not(variables('isStorage'))]",
+              "condition": "[variables('isCognitiveServices')]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName'))]",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', variables('roleAssignmentScopeName'))]",
               "name": "[variables('roleAssignmentName')]",
               "properties": {
                 "principalId": "[parameters('principalId')]",
@@ -1386,7 +1432,31 @@
               "condition": "[variables('isStorage')]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('targetName'))]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', variables('roleAssignmentScopeName'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('isRegistry')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', variables('roleAssignmentScopeName'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('isContainerApp')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', variables('roleAssignmentScopeName'))]",
               "name": "[variables('roleAssignmentName')]",
               "properties": {
                 "principalId": "[parameters('principalId')]",
@@ -1401,7 +1471,7 @@
               "metadata": {
                 "description": "The resource ID of the role assignment."
               },
-              "value": "[if(variables('isStorage'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', parameters('targetName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')))]"
+              "value": "[if(variables('isStorage'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', variables('roleAssignmentScopeName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), if(variables('isCognitiveServices'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', variables('roleAssignmentScopeName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), if(variables('isRegistry'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', variables('roleAssignmentScopeName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), extensionResourceId(resourceId('Microsoft.App/containerApps', variables('roleAssignmentScopeName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')))))]"
             },
             "name": {
               "type": "string",
@@ -1456,24 +1526,57 @@
             "_generator": {
               "name": "bicep",
               "version": "0.43.8.12551",
-              "templateHash": "7584345935908390266"
+              "templateHash": "16873888977377597378"
             }
           },
           "parameters": {
             "targetKind": {
               "type": "string",
+              "defaultValue": "",
               "allowedValues": [
+                "",
                 "CognitiveServicesAccount",
-                "StorageAccount"
+                "StorageAccount",
+                "ContainerRegistry",
+                "ContainerApp"
               ],
               "metadata": {
-                "description": "Kind of the resource that the role is scoped to."
+                "description": "Kind of the resource that the role is scoped to (legacy parameter; prefer target*Name parameters)."
               }
             },
             "targetName": {
               "type": "string",
+              "defaultValue": "",
               "metadata": {
-                "description": "Name of the target resource (Cognitive Services account or Storage account)."
+                "description": "Name of the target resource (legacy parameter paired with targetKind; prefer target*Name parameters)."
+              }
+            },
+            "targetAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the target Cognitive Services account scope."
+              }
+            },
+            "targetStorageAccountName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the target Storage account scope."
+              }
+            },
+            "targetRegistryName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the target Container Registry scope."
+              }
+            },
+            "targetContainerAppName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Name of the target Container App scope."
               }
             },
             "principalId": {
@@ -1504,15 +1607,28 @@
             }
           },
           "variables": {
-            "isStorage": "[equals(parameters('targetKind'), 'StorageAccount')]",
-            "roleAssignmentName": "[guid(parameters('targetKind'), parameters('targetName'), parameters('principalId'), parameters('roleDefinitionId'))]"
+            "legacyTargetAccountName": "[if(equals(parameters('targetKind'), 'CognitiveServicesAccount'), parameters('targetName'), '')]",
+            "legacyTargetStorageAccountName": "[if(equals(parameters('targetKind'), 'StorageAccount'), parameters('targetName'), '')]",
+            "legacyTargetRegistryName": "[if(equals(parameters('targetKind'), 'ContainerRegistry'), parameters('targetName'), '')]",
+            "legacyTargetContainerAppName": "[if(equals(parameters('targetKind'), 'ContainerApp'), parameters('targetName'), '')]",
+            "resolvedStorageAccountName": "[if(not(empty(parameters('targetStorageAccountName'))), parameters('targetStorageAccountName'), variables('legacyTargetStorageAccountName'))]",
+            "resolvedAccountName": "[if(not(empty(parameters('targetAccountName'))), parameters('targetAccountName'), variables('legacyTargetAccountName'))]",
+            "resolvedRegistryName": "[if(not(empty(parameters('targetRegistryName'))), parameters('targetRegistryName'), variables('legacyTargetRegistryName'))]",
+            "resolvedContainerAppName": "[if(not(empty(parameters('targetContainerAppName'))), parameters('targetContainerAppName'), variables('legacyTargetContainerAppName'))]",
+            "roleAssignmentScopeName": "[if(not(empty(variables('resolvedStorageAccountName'))), variables('resolvedStorageAccountName'), if(not(empty(variables('resolvedAccountName'))), variables('resolvedAccountName'), if(not(empty(variables('resolvedRegistryName'))), variables('resolvedRegistryName'), variables('resolvedContainerAppName'))))]",
+            "roleAssignmentScopeKind": "[if(not(empty(variables('resolvedStorageAccountName'))), 'StorageAccount', if(not(empty(variables('resolvedAccountName'))), 'CognitiveServicesAccount', if(not(empty(variables('resolvedRegistryName'))), 'ContainerRegistry', 'ContainerApp')))]",
+            "isStorage": "[equals(variables('roleAssignmentScopeKind'), 'StorageAccount')]",
+            "isCognitiveServices": "[equals(variables('roleAssignmentScopeKind'), 'CognitiveServicesAccount')]",
+            "isRegistry": "[equals(variables('roleAssignmentScopeKind'), 'ContainerRegistry')]",
+            "isContainerApp": "[equals(variables('roleAssignmentScopeKind'), 'ContainerApp')]",
+            "roleAssignmentName": "[guid(variables('roleAssignmentScopeKind'), variables('roleAssignmentScopeName'), parameters('principalId'), parameters('roleDefinitionId'))]"
           },
           "resources": [
             {
-              "condition": "[not(variables('isStorage'))]",
+              "condition": "[variables('isCognitiveServices')]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName'))]",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', variables('roleAssignmentScopeName'))]",
               "name": "[variables('roleAssignmentName')]",
               "properties": {
                 "principalId": "[parameters('principalId')]",
@@ -1524,7 +1640,31 @@
               "condition": "[variables('isStorage')]",
               "type": "Microsoft.Authorization/roleAssignments",
               "apiVersion": "2022-04-01",
-              "scope": "[resourceId('Microsoft.Storage/storageAccounts', parameters('targetName'))]",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts', variables('roleAssignmentScopeName'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('isRegistry')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', variables('roleAssignmentScopeName'))]",
+              "name": "[variables('roleAssignmentName')]",
+              "properties": {
+                "principalId": "[parameters('principalId')]",
+                "roleDefinitionId": "[parameters('roleDefinitionId')]",
+                "principalType": "[parameters('principalType')]"
+              }
+            },
+            {
+              "condition": "[variables('isContainerApp')]",
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.App/containerApps', variables('roleAssignmentScopeName'))]",
               "name": "[variables('roleAssignmentName')]",
               "properties": {
                 "principalId": "[parameters('principalId')]",
@@ -1539,7 +1679,7 @@
               "metadata": {
                 "description": "The resource ID of the role assignment."
               },
-              "value": "[if(variables('isStorage'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', parameters('targetName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', parameters('targetName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')))]"
+              "value": "[if(variables('isStorage'), extensionResourceId(resourceId('Microsoft.Storage/storageAccounts', variables('roleAssignmentScopeName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), if(variables('isCognitiveServices'), extensionResourceId(resourceId('Microsoft.CognitiveServices/accounts', variables('roleAssignmentScopeName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), if(variables('isRegistry'), extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', variables('roleAssignmentScopeName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')), extensionResourceId(resourceId('Microsoft.App/containerApps', variables('roleAssignmentScopeName')), 'Microsoft.Authorization/roleAssignments', variables('roleAssignmentName')))))]"
             },
             "name": {
               "type": "string",
